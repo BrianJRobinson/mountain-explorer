@@ -49,7 +49,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       await onToggleCompletion(mountain.id, newState);
       // Keep our flag true since the API succeeded
       ignoreNextPropChange.current = true;
-    } catch (error) {
+    } catch {
       // If the API call fails, revert the visual state
       setCurrentState(!newState);
       // Reset our flag since we want to sync with the server state

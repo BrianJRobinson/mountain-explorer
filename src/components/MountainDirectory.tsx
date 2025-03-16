@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MountainCard } from './MountainCard';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
@@ -7,6 +7,10 @@ import toast from 'react-hot-toast';
 
 interface MountainDirectoryProps {
   mountains: Mountain[];
+}
+
+interface MountainCompletion {
+  mountainId: number;
 }
 
 export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains }) => {
@@ -17,6 +21,49 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [completedMountains, setCompletedMountains] = useState<number[]>([]);
   const [isLoadingCompletions, setIsLoadingCompletions] = useState(true);
+
+  const fetchCompletedMountains = useCallback(async () => {
+    try {
+      if (!session?.user?.id) {
+        console.log('No user ID available, skipping fetch');
+        setIsLoadingCompletions(false);
+        return;
+      }
+
+      setIsLoadingCompletions(true);
+      
+      const response = await fetch('/api/mountains/completed', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCompletedMountains(data.map((completion: MountainCompletion) => completion.mountainId));
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to fetch completed mountains:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+          session: session
+        });
+      }
+    } catch (error) {
+      console.error('Error in fetchCompletedMountains:', error);
+    } finally {
+      setIsLoadingCompletions(false);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      fetchCompletedMountains();
+    }
+  }, [session, status, fetchCompletedMountains]);
 
   useEffect(() => {
     console.log('Session status:', status);
@@ -38,54 +85,6 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
-      console.log('Triggering fetch of completed mountains...');
-      fetchCompletedMountains();
-    }
-  }, [session, status]);
-
-  const fetchCompletedMountains = async () => {
-    try {
-      if (!session?.user?.id) {
-        console.log('No user ID available, skipping fetch');
-        setIsLoadingCompletions(false);
-        return;
-      }
-
-      console.log('Starting to fetch completed mountains...');
-      setIsLoadingCompletions(true);
-      
-      const response = await fetch('/api/mountains/completed', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
-      
-      console.log('Response status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Successfully fetched completed mountains:', data);
-        setCompletedMountains(data.map((completion: any) => completion.mountainId));
-      } else {
-        const errorData = await response.json();
-        console.error('Failed to fetch completed mountains:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData,
-          session: session
-        });
-      }
-    } catch (error) {
-      console.error('Error in fetchCompletedMountains:', error);
-    } finally {
-      setIsLoadingCompletions(false);
-    }
-  };
 
   const handleToggleCompletion = async (mountainId: number, completed: boolean) => {
     try {
@@ -136,10 +135,10 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const corbettCount = filteredMountains.filter(m => m.MountainCategoryID === 11).length;
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen">
+    <div className="container mx-auto px-4 py-8 min-h-screen" id="mountains">
       <div className="sticky top-16 z-40 bg-gray-900/95 backdrop-blur-sm py-4 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex space-x-2 p-2 bg-gray-900 rounded-xl shadow-inner">
+          <div className="flex space-x-2 p-2 md:flex-row bg-gray-900 rounded-xl shadow-inner">
             <button
               type="button"
               onClick={(e) => {

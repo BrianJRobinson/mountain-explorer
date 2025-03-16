@@ -12,6 +12,9 @@ export async function POST(request: Request) {
     if (!name || !email || !password) {
       return new NextResponse(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
     }
 
@@ -23,6 +26,9 @@ export async function POST(request: Request) {
     if (existingUser) {
       return new NextResponse(JSON.stringify({ error: 'Email already registered' }), {
         status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
     }
 
@@ -32,22 +38,32 @@ export async function POST(request: Request) {
     // Create user
     const user = await prisma.user.create({
       data: {
-        name,
         email,
         password: hashedPassword,
+        name: name || email.split('@')[0],
+      },
+      // Only select the fields we want to return
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
       },
     });
 
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
-
-    return new NextResponse(JSON.stringify(userWithoutPassword), {
+    return new NextResponse(JSON.stringify(user), {
       status: 201,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
   } catch (error) {
     console.error('Registration error:', error);
     return new NextResponse(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
   } finally {
     await prisma.$disconnect();
