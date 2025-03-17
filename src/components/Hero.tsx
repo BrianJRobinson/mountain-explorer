@@ -27,7 +27,7 @@ export const Hero = () => {
           Discover UK&apos;s Majestic Mountains
         </h1>
         <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto">
-          Explore detailed information about the United Kingdom&apos;s most beautiful peaks
+          Track your journey to the top of the UK&apos;s most beautiful mountains. Check them off as you complete them.
         </p>
         <a 
           href="#mountains"
