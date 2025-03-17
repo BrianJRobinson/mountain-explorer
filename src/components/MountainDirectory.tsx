@@ -93,7 +93,11 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ mountainId, completed }),
+        body: JSON.stringify({ 
+          mountainId, 
+          completed,
+          userId: session?.user?.id 
+        }),
       });
 
       if (!response.ok) {
