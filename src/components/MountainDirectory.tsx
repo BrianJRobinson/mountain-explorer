@@ -142,7 +142,7 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
     <div className="container mx-auto px-4 py-8 min-h-screen" id="mountains">
       <div className="sticky top-16 z-40 bg-gray-900/95 backdrop-blur-sm py-4 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex space-x-2 p-2 md:flex-row bg-gray-900 rounded-xl shadow-inner">
+          <div className="flex flex-wrap gap-2 p-2 w-full md:w-auto bg-gray-900 rounded-xl shadow-inner">
             <button
               type="button"
               onClick={(e) => {
