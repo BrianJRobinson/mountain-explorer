@@ -1,6 +1,11 @@
+'use client';
+
 import React from 'react';
+import { useSession } from 'next-auth/react';
 
 export const Hero = () => {
+  const { data: session } = useSession();
+
   return (
     <section 
       className="relative h-screen flex items-center justify-center"
@@ -11,6 +16,13 @@ export const Hero = () => {
       }}
     >
       <div className="text-center text-white z-10 px-4">
+        {session?.user && (
+          <div className="mb-8 md:hidden">
+            <h2 className="text-2xl font-semibold">
+              Welcome, {session.user.name || session.user.email}
+            </h2>
+          </div>
+        )}
         <h1 className="text-5xl md:text-6xl font-bold mb-6">
           Discover UK&apos;s Majestic Mountains
         </h1>

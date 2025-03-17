@@ -15,7 +15,7 @@ export default async function Home() {
   const mountains = await getData();
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900 overflow-x-hidden">
       <Navbar />
       <Hero />
       <main className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-16">
