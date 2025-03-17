@@ -4,13 +4,13 @@ interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
-  data?: any;
+  data?: unknown;
   userId?: string;
   action?: string;
 }
 
 class Logger {
-  private log(level: LogLevel, message: string, data?: any, userId?: string, action?: string) {
+  private log(level: LogLevel, message: string, data?: unknown, userId?: string, action?: string) {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -37,19 +37,19 @@ class Logger {
     // });
   }
 
-  info(message: string, data?: any, userId?: string, action?: string) {
+  info(message: string, data?: unknown, userId?: string, action?: string): void {
     this.log('info', message, data, userId, action);
   }
 
-  warn(message: string, data?: any, userId?: string, action?: string) {
+  warn(message: string, data?: unknown, userId?: string, action?: string): void {
     this.log('warn', message, data, userId, action);
   }
 
-  error(message: string, data?: any, userId?: string, action?: string) {
+  error(message: string, data?: unknown, userId?: string, action?: string): void {
     this.log('error', message, data, userId, action);
   }
 
-  debug(message: string, data?: any, userId?: string, action?: string) {
+  debug(message: string, data?: unknown, userId?: string, action?: string): void {
     if (process.env.NODE_ENV !== 'production') {
       this.log('debug', message, data, userId, action);
     }
