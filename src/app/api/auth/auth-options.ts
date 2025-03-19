@@ -1,7 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { compare } from 'bcryptjs';
+import prisma from '@/lib/prisma';
+import { verifyCaptcha } from '@/lib/captcha';
+import { logger } from '@/lib/logger';
 
 declare module 'next-auth' {
   interface Session {
@@ -14,8 +16,6 @@ declare module 'next-auth' {
   }
 }
 
-const prisma = new PrismaClient();
-
 if (!process.env.NEXTAUTH_SECRET) {
   throw new Error('NEXTAUTH_SECRET is not defined');
 }
@@ -23,52 +23,84 @@ if (!process.env.NEXTAUTH_SECRET) {
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: 'credentials',
       credentials: {
-        email: { label: "Email", type: "text" },
-        password: { label: "Password", type: "password" }
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+        captchaToken: { label: 'CAPTCHA Token', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
+        try {
+          if (!credentials?.email || !credentials?.password || !credentials?.captchaToken) {
+            logger.error('Missing credentials:', { 
+              hasEmail: !!credentials?.email,
+              hasPassword: !!credentials?.password,
+              hasCaptcha: !!credentials?.captchaToken
+            });
+            throw new Error('Please provide all required fields');
+          }
+
+          // Verify CAPTCHA
+          const isValidCaptcha = await verifyCaptcha(credentials.captchaToken);
+          if (!isValidCaptcha) {
+            logger.error('Invalid CAPTCHA token');
+            throw new Error('Invalid CAPTCHA');
+          }
+
+          // Find user
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+          });
+
+          if (!user) {
+            logger.error('User not found:', { email: credentials.email });
+            throw new Error('Invalid email or password');
+          }
+
+          // Verify password
+          const isValidPassword = await compare(credentials.password, user.password);
+
+          if (!isValidPassword) {
+            logger.error('Invalid password for user:', { email: credentials.email });
+            throw new Error('Invalid email or password');
+          }
+
+          // Check if email is verified
+          if (!user.emailVerified) {
+            logger.error('Email not verified:', { email: credentials.email });
+            throw new Error('Please verify your email address before signing in');
+          }
+
+          logger.info('Login successful:', { 
+            userId: user.id,
+            email: user.email,
+            name: user.name 
+          });
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+          };
+        } catch (error) {
+          logger.error('Authorization error:', error);
+          throw error;
         }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email,
-          },
-        });
-
-        if (!user) {
-          return null;
-        }
-
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
-      }
+      },
     })
   ],
   session: {
     strategy: 'jwt'
   },
   callbacks: {
-    async jwt({ token, user }) {
+    jwt: async ({ token, user }) => {
       if (user) {
         token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }) {
-      if (session.user) {
+    session: async ({ session, token }) => {
+      if (token && session.user) {
         session.user.id = token.id as string;
       }
       return session;

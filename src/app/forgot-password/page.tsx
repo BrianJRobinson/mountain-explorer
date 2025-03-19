@@ -1,10 +1,9 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 import { logger } from '@/lib/logger';
 
 declare global {
@@ -16,7 +15,7 @@ declare global {
   }
 }
 
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,7 +31,7 @@ export default function LoginPage() {
           try {
             const token = await window.grecaptcha.execute(
               process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!,
-              { action: 'login' }
+              { action: 'forgot_password' }
             );
             resolve(token);
           } catch (error) {
@@ -53,27 +52,30 @@ export default function LoginPage() {
     try {
       const formData = new FormData(event.currentTarget);
       const email = formData.get('email') as string;
-      const password = formData.get('password') as string;
+      const recaptchaToken = await executeRecaptcha();
 
-      const captchaToken = await executeRecaptcha();
-
-      const result = await signIn('credentials', {
-        email,
-        password,
-        captchaToken,
-        redirect: false,
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          recaptchaToken,
+        }),
       });
 
-      if (result?.error) {
-        toast.error(result.error);
-        return;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send reset email');
       }
 
-      router.refresh();
-      router.push('/');
+      toast.success('If an account exists with this email, you will receive password reset instructions.');
+      router.push('/login');
     } catch (error) {
-      logger.error('Login error:', error);
-      toast.error('An error occurred during login');
+      logger.error('Password reset request error:', error);
+      toast.error('Failed to send reset email. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +92,7 @@ export default function LoginPage() {
     >
       <div className="max-w-md w-full space-y-8 bg-gray-900/80 backdrop-blur-sm p-8 rounded-lg shadow-2xl border border-gray-700 relative">
         <Link
-          href="/"
+          href="/login"
           className="absolute -top-12 left-0 flex items-center text-gray-100 hover:text-orange-400 transition-colors group bg-gray-900/70 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-700 shadow-lg"
         >
           <svg 
@@ -101,56 +103,32 @@ export default function LoginPage() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to Home
+          Back to Login
         </Link>
 
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-            Sign in to your account
+            Reset your password
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-400">
+            Enter your email address and we&apos;ll send you a link to reset your password.
+          </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
-                placeholder="Email address"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
-                placeholder="Password"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <Link
-                href="/forgot-password"
-                className="font-medium text-orange-400 hover:text-orange-300"
-              >
-                Forgot your password?
-              </Link>
-            </div>
+          <div>
+            <label htmlFor="email" className="sr-only">
+              Email address
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              className="appearance-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
+              placeholder="Email address"
+            />
           </div>
 
           <div>
@@ -163,19 +141,19 @@ export default function LoginPage() {
                   : 'bg-orange-500 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500'
               }`}
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Sending...' : 'Send reset link'}
             </button>
           </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-400">
-              Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-orange-400 hover:text-orange-300">
-                Register
-              </Link>
-            </p>
-          </div>
         </form>
+
+        <div className="text-center">
+          <p className="text-sm text-gray-400">
+            Remember your password?{' '}
+            <Link href="/login" className="text-orange-400 hover:text-orange-300">
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

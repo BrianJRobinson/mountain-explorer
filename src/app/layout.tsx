@@ -3,12 +3,13 @@ import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
+import { ReCaptchaScript } from '@/components/ReCaptchaScript'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Mountain Explorer',
-  description: 'Track your mountain climbing progress',
+  description: 'Discover and track your mountain adventures',
   icons: {
     icon: '/mountain.jpg',
     shortcut: '/mountain.jpg',
@@ -22,9 +23,16 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <div className="min-h-screen flex flex-col">
+            <div className="flex-grow">
+              {children}
+            </div>
+            <ReCaptchaScript />
+          </div>
+        </Providers>
         <Toaster 
           position="bottom-right"
           toastOptions={{

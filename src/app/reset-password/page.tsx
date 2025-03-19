@@ -1,10 +1,9 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 import { logger } from '@/lib/logger';
 
 declare global {
@@ -16,9 +15,11 @@ declare global {
   }
 }
 
-export default function LoginPage() {
+function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const token = searchParams.get('token');
 
   async function executeRecaptcha(): Promise<string> {
     try {
@@ -32,7 +33,7 @@ export default function LoginPage() {
           try {
             const token = await window.grecaptcha.execute(
               process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!,
-              { action: 'login' }
+              { action: 'reset_password' }
             );
             resolve(token);
           } catch (error) {
@@ -52,28 +53,49 @@ export default function LoginPage() {
 
     try {
       const formData = new FormData(event.currentTarget);
-      const email = formData.get('email') as string;
       const password = formData.get('password') as string;
+      const confirmPassword = formData.get('confirmPassword') as string;
 
-      const captchaToken = await executeRecaptcha();
-
-      const result = await signIn('credentials', {
-        email,
-        password,
-        captchaToken,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error(result.error);
+      if (password !== confirmPassword) {
+        toast.error('Passwords do not match');
         return;
       }
 
-      router.refresh();
-      router.push('/');
+      if (password.length < 8) {
+        toast.error('Password must be at least 8 characters long');
+        return;
+      }
+
+      if (!token) {
+        toast.error('Reset token is missing');
+        return;
+      }
+
+      const recaptchaToken = await executeRecaptcha();
+
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          password,
+          recaptchaToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reset password');
+      }
+
+      toast.success('Password has been reset successfully');
+      router.push('/login');
     } catch (error) {
-      logger.error('Login error:', error);
-      toast.error('An error occurred during login');
+      logger.error('Password reset error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reset password');
     } finally {
       setIsLoading(false);
     }
@@ -90,7 +112,7 @@ export default function LoginPage() {
     >
       <div className="max-w-md w-full space-y-8 bg-gray-900/80 backdrop-blur-sm p-8 rounded-lg shadow-2xl border border-gray-700 relative">
         <Link
-          href="/"
+          href="/login"
           className="absolute -top-12 left-0 flex items-center text-gray-100 hover:text-orange-400 transition-colors group bg-gray-900/70 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-700 shadow-lg"
         >
           <svg 
@@ -101,55 +123,47 @@ export default function LoginPage() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Back to Home
+          Back to Login
         </Link>
 
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
-            Sign in to your account
+            Reset your password
           </h2>
+          <p className="mt-2 text-center text-sm text-gray-400">
+            Enter your new password below
+          </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
-                placeholder="Email address"
-              />
-            </div>
-            <div>
               <label htmlFor="password" className="sr-only">
-                Password
+                New Password
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
-                placeholder="Password"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-t-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
+                placeholder="New Password"
               />
             </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <Link
-                href="/forgot-password"
-                className="font-medium text-orange-400 hover:text-orange-300"
-              >
-                Forgot your password?
-              </Link>
+            <div>
+              <label htmlFor="confirmPassword" className="sr-only">
+                Confirm Password
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-600 placeholder-gray-400 bg-gray-800/50 text-gray-100 rounded-b-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm backdrop-blur-sm"
+                placeholder="Confirm Password"
+              />
             </div>
           </div>
 
@@ -163,20 +177,23 @@ export default function LoginPage() {
                   : 'bg-orange-500 hover:bg-orange-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500'
               }`}
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Resetting password...' : 'Reset password'}
             </button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm text-gray-400">
-              Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-orange-400 hover:text-orange-300">
-                Register
-              </Link>
-            </p>
           </div>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 } 

@@ -8,21 +8,26 @@ datasource db {
 }
 
 model User {
-  id               String               @id @default(cuid())
-  name             String?
-  email            String               @unique
-  password         String
-  mountainProgress MountainCompletion[]
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  id                       String               @id @default(cuid())
+  name                     String?
+  email                    String               @unique
+  password                 String
+  emailVerified            DateTime?
+  verificationToken        String?              @unique
+  verificationTokenExpires DateTime?
+  resetToken               String?              @unique
+  resetTokenExpires        DateTime?
+  mountainProgress         MountainCompletion[]
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
 }
 
 model MountainCompletion {
-  id         String   @id @default(cuid())
-  userId     String
-  mountainId Int
+  id          String   @id @default(cuid())
+  userId      String
+  mountainId  Int
   completedAt DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, mountainId])
-} 
+}
