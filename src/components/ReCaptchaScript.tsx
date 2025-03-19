@@ -17,22 +17,21 @@ export function ReCaptchaScript() {
     `;
     document.head.appendChild(style);
 
-    // Only load if not already loaded
-    if (!window.grecaptcha) {
-      const script = document.createElement('script');
-      script.src = `https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}&badge=bottomright`;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
+    // Load reCAPTCHA v3 script
+    const script = document.createElement('script');
+    script.src = `https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}&badge=bottomright`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
 
-      return () => {
-        document.head.removeChild(script);
-        document.head.removeChild(style);
-        // Clean up reCAPTCHA elements on unmount
-        const elements = document.querySelectorAll('.grecaptcha-badge');
-        elements.forEach(element => element.remove());
-      };
-    }
+    // Cleanup function
+    return () => {
+      document.head.removeChild(script);
+      document.head.removeChild(style);
+      // Clean up reCAPTCHA elements on unmount
+      const elements = document.querySelectorAll('.grecaptcha-badge');
+      elements.forEach(element => element.remove());
+    };
   }, []);
 
   // Add a small notice about reCAPTCHA as required by Google's terms

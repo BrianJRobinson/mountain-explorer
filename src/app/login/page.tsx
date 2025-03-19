@@ -22,27 +22,30 @@ export default function LoginPage() {
 
   async function executeRecaptcha(): Promise<string> {
     try {
-      return await new Promise((resolve, reject) => {
-        if (!window.grecaptcha) {
-          reject(new Error('reCAPTCHA not loaded'));
-          return;
+      // Wait for reCAPTCHA to be ready
+      await new Promise<void>((resolve) => {
+        if (window.grecaptcha) {
+          resolve();
+        } else {
+          // If grecaptcha is not available yet, wait for it
+          window.addEventListener('grecaptchaLoaded', () => resolve(), { once: true });
         }
-
-        window.grecaptcha.ready(async () => {
-          try {
-            const token = await window.grecaptcha.execute(
-              process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!,
-              { action: 'login' }
-            );
-            resolve(token);
-          } catch (error) {
-            reject(error);
-          }
-        });
       });
+
+      // Now that we're sure grecaptcha is available, execute it
+      const token = await window.grecaptcha.execute(
+        process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!,
+        { action: 'login' }
+      );
+
+      if (!token) {
+        throw new Error('No reCAPTCHA token received');
+      }
+
+      return token;
     } catch (error) {
       logger.error('Failed to execute reCAPTCHA:', error);
-      throw new Error('Failed to execute reCAPTCHA');
+      throw new Error('Failed to verify you are human. Please try again.');
     }
   }
 
