@@ -22,7 +22,7 @@ export const Footer = () => {
               <h3 className="text-xl font-semibold text-orange-500">Pineysoft - Mountain Explorer</h3>
             </div>
             <p className="text-sm text-gray-400 mb-4">
-              Discover and track your journey through Scotland's magnificent Munros and Corbetts.
+              Discover and track your journey through Scotland&apos;s magnificent Munros and Corbetts.
               Plan your adventures, mark your achievements, and join a community of mountain enthusiasts.
             </p>
           </div>

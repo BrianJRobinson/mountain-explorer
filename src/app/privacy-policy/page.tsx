@@ -69,7 +69,7 @@ const PrivacyPolicy: React.FC = () => {
             <h2 className="text-2xl font-semibold text-white mt-8 mb-4">6. Changes to This Privacy Policy</h2>
             <p className="text-gray-300">
               We may update this Privacy Policy from time to time. Any changes will be
-              posted on this page with an updated "Last updated" date.
+              posted on this page with an updated &quot;Last updated&quot; date.
             </p>
 
             <h2 className="text-2xl font-semibold text-white mt-8 mb-4">7. Contact Us</h2>
