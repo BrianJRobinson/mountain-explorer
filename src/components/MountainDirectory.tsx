@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { MountainCard } from './MountainCard';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
@@ -21,6 +22,8 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [completedMountains, setCompletedMountains] = useState<number[]>([]);
   const [isLoadingCompletions, setIsLoadingCompletions] = useState(true);
+  const [columnCount, setColumnCount] = useState(5); // Default to 5 columns
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const fetchCompletedMountains = useCallback(async () => {
     try {
@@ -86,6 +89,21 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Update column count based on screen size
+  useEffect(() => {
+    const updateColumnCount = () => {
+      const width = window.innerWidth;
+      if (width < 768) setColumnCount(1); // mobile
+      else if (width < 1024) setColumnCount(2); // tablet
+      else if (width < 1280) setColumnCount(3); // laptop
+      else setColumnCount(5); // desktop
+    };
+
+    updateColumnCount();
+    window.addEventListener('resize', updateColumnCount);
+    return () => window.removeEventListener('resize', updateColumnCount);
+  }, []);
+
   const handleToggleCompletion = async (mountainId: number, completed: boolean) => {
     try {
       const response = await fetch('/api/mountains/toggle-completion', {
@@ -137,6 +155,18 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
   const munroCount = filteredMountains.filter(m => m.MountainCategoryID === 12).length;
   const corbettCount = filteredMountains.filter(m => m.MountainCategoryID === 11).length;
+
+  // Calculate rows needed based on number of items and columns
+  const rowCount = Math.ceil(filteredMountains.length / columnCount);
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 400, // Estimated height of each row
+    overscan: 5, // Number of items to render outside of the visible area
+  });
+
+  const totalHeight = virtualizer.getTotalSize();
 
   return (
     <div className="container mx-auto px-4 py-8 min-h-screen" id="mountains">
@@ -206,26 +236,59 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
               placeholder="Search mountains..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full md:w-64 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 
-                placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent
-                shadow-inner"
+              className="w-full md:w-64 px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent shadow-inner"
             />
           </div>
         </div>
       </div>
 
       <div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6"
+        ref={parentRef}
+        className="h-[800px] overflow-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-orange-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-orange-500/70"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(249, 115, 22, 0.5) rgb(31, 41, 55)'
+        }}
       >
-        {filteredMountains.map((mountain) => (
-          <MountainCard
-            key={mountain.id}
-            mountain={mountain}
-            isCompleted={completedMountains.includes(mountain.id)}
-            onToggleCompletion={handleToggleCompletion}
-            isInitialLoading={status === 'authenticated' && isLoadingCompletions}
-          />
-        ))}
+        <div
+          style={{
+            height: `${totalHeight}px`,
+            width: '100%',
+            position: 'relative',
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const startIndex = virtualRow.index * columnCount;
+            const rowMountains = filteredMountains.slice(startIndex, startIndex + columnCount);
+
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 p-0.5">
+                  {rowMountains.map((mountain) => (
+                    <MountainCard
+                      key={mountain.id}
+                      mountain={mountain}
+                      isCompleted={completedMountains.includes(mountain.id)}
+                      onToggleCompletion={handleToggleCompletion}
+                      isInitialLoading={status === 'authenticated' && isLoadingCompletions}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

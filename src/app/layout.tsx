@@ -4,6 +4,7 @@ import { Providers } from './providers'
 import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
 import { ReCaptchaScript } from '@/components/ReCaptchaScript'
+import { Footer } from '@/components/Footer'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -23,16 +24,15 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className={`${inter.className} bg-gray-900 text-gray-100 min-h-screen flex flex-col`}>
         <Providers>
-          <div className="min-h-screen flex flex-col">
-            <div className="flex-grow">
-              {children}
-            </div>
-            <ReCaptchaScript />
+          <div className="flex-grow">
+            {children}
           </div>
+          <Footer />
         </Providers>
+        <ReCaptchaScript />
         <Toaster 
           position="bottom-right"
           toastOptions={{
