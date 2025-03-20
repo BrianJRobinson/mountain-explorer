@@ -14,15 +14,37 @@ export const Navbar = () => {
           {/* Top row */}
           <div className="flex items-center justify-between h-14">
             <div className="w-1/4">
-              <Link href="/" className="text-white text-lg font-bold">
+              <Link href="/" className="text-white text-2xl font-bold flex items-center gap-2">
+                <svg 
+                  className="w-8 h-8 text-orange-500" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path 
+                    d="M12 3L3 21H21L12 3Z" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                  <path 
+                    d="M12 3L7 14H17L12 3Z" 
+                    fill="currentColor" 
+                    fillOpacity="0.2"
+                  />
+                </svg>
                 Mountain Explorer
               </Link>
             </div>
             <div className="w-1/2 flex justify-end items-center">
               {session?.user ? (
-                <span className="text-white text-sm sm:text-base truncate hidden md:block">
-                  Welcome, {session.user.name || session.user.email}
-                </span>
+                  <button
+                    onClick={() => signOut()}
+                    className="bg-orange-500 text-white shadow-lg transition-colors px-3 py-1.5 rounded-lg text-sm sm:text-base"
+                  >
+                    Sign out
+                  </button>
               ) : (
                 <>
                   <Link
@@ -42,17 +64,6 @@ export const Navbar = () => {
             </div>
           </div>
           
-          {/* Bottom row - only shown when logged in */}
-          {session?.user && (
-            <div className="flex justify-end pb-2">
-              <button
-                onClick={() => signOut()}
-                className="text-white hover:text-gray-300 transition-colors text-sm sm:text-base bg-gray-800/50 px-3 py-1 rounded"
-              >
-                Sign out
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </nav>

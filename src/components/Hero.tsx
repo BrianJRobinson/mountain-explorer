@@ -17,8 +17,8 @@ export const Hero = () => {
     >
       <div className="text-center text-white z-10 px-4">
         {session?.user && (
-          <div className="mb-8 md:hidden">
-            <h2 className="text-2xl font-semibold">
+          <div className="mb-8">
+            <h2 className="text-4xl font-semibold">
               Welcome, {session.user.name || session.user.email}
             </h2>
           </div>
