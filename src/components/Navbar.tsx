@@ -13,8 +13,8 @@ export const Navbar = () => {
         <div className="flex flex-col">
           {/* Top row */}
           <div className="flex items-center justify-between h-14">
-            <div className="w-1/4">
-              <Link href="/" className="text-white text-2xl font-bold flex items-center gap-2">
+            <div className="w-1/3">
+              <Link href="/" className="text-white text-sm md:text-2xl font-bold flex items-center gap-2">
                 <svg 
                   className="w-8 h-8 text-orange-500" 
                   viewBox="0 0 24 24" 

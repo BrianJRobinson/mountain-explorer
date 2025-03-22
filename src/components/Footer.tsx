@@ -37,7 +37,7 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="#mountains" className="text-gray-400 hover:text-orange-500 transition-colors">
+                <Link href="/#mountains" className="text-gray-400 hover:text-orange-500 transition-colors">
                   Mountains
                 </Link>
               </li>
