@@ -12,4 +12,9 @@ if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;
 }
 
+// Clear prepared statements cache on first import
+if (!globalForPrisma.prisma) {
+  prisma.$executeRawUnsafe('DISCARD ALL').catch(console.error);
+}
+
 export default prisma; 

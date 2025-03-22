@@ -7,4 +7,14 @@ export interface Mountain {
   ukHillsDbSection: string;
   MountainCategoryID: number;
   urlName: string;
+  averageRating?: number;
+  totalRatings?: number;
+  userRating?: number;
+  userComment?: string;
+  recentComments?: Array<{
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+    userName: string | null;
+  }>;
 } 

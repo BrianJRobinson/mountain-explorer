@@ -25,6 +25,12 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const [columnCount, setColumnCount] = useState(5); // Default to 5 columns
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // Card dimensions
+  const IMAGE_HEIGHT = 152; // h-38
+  const CONTENT_HEIGHT = 240; // Content section height
+  const CARD_HEIGHT = IMAGE_HEIGHT + CONTENT_HEIGHT;
+  const ROW_GAP = 8; // gap-4 instead of gap-6
+
   const fetchCompletedMountains = useCallback(async () => {
     try {
       if (!session?.user?.id) {
@@ -162,8 +168,8 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 400, // Estimated height of each row
-    overscan: 5, // Number of items to render outside of the visible area
+    estimateSize: () => CARD_HEIGHT + ROW_GAP,
+    overscan: 5,
   });
 
   const totalHeight = virtualizer.getTotalSize();
@@ -274,7 +280,10 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 p-0.5">
+                <div 
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"
+                  style={{ height: CARD_HEIGHT }}
+                >
                   {rowMountains.map((mountain) => (
                     <MountainCard
                       key={mountain.id}
