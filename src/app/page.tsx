@@ -6,13 +6,25 @@ import path from 'path';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './api/auth/auth-options';
+import { Mountain } from '@/app/types/Mountain';
+
+interface RawMountain {
+  id: number;
+  ukHillsDbName: string;
+  Height: number;
+  ukHillsDbLatitude: string;
+  ukHillsDbLongitude: string;
+  ukHillsDbSection: string;
+  MountainCategoryID: number;
+  urlName: string;
+}
 
 async function getData() {
   const session = await getServerSession(authOptions);
   const dataDirectory = path.join(process.cwd(), 'public/data');
   const fileContents = await fs.readFile(dataDirectory + '/data.json', 'utf8');
   const data = JSON.parse(fileContents);
-  const mountains = data.pageProps.mountains;
+  const mountains: RawMountain[] = data.pageProps.mountains;
 
   // Fetch ratings for all mountains
   const allRatings = await prisma.mountainRating.findMany({
@@ -49,7 +61,7 @@ async function getData() {
 
   // If user is logged in, fetch their ratings and recent comments
   let userRatings = new Map();
-  let recentComments = new Map();
+  const recentComments = new Map();
   
 
   if (session?.user?.id) {
@@ -107,21 +119,21 @@ async function getData() {
       if (comments.length < 5) {
         comments.push({
           rating: comment.rating,
-          comment: comment.comment,
-          createdAt: comment.createdAt,
-          userName: comment.user.name
+          comment: comment.comment || null,
+          createdAt: comment.createdAt.toISOString(),
+          userName: comment.user.name || null
         });
       }
     });
   }
 
   // Add rating data to each mountain
-  return mountains.map((mountain: any) => ({
+  return mountains.map((mountain: RawMountain): Mountain => ({
     ...mountain,
     ...ratingAverages.get(mountain.id),
     ...(session?.user?.id && {
       userRating: userRatings.get(mountain.id)?.rating,
-      userComment: userRatings.get(mountain.id)?.comment,
+      userComment: userRatings.get(mountain.id)?.comment || null,
       recentComments: recentComments.get(mountain.id) || [],
     }),
   }));

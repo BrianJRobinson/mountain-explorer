@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
 import { toast } from 'react-hot-toast';
-import { createPortal } from 'react-dom';
 
 interface MountainCardProps {
   mountain: Mountain;
@@ -28,7 +27,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showComments, setShowComments] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const [mountainData, setMountainData] = useState(mountain);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const ignoreNextPropChange = useRef(false);
@@ -51,12 +49,13 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     setSelectedRating(value);
   };
 
-  const handleStarHover = (starIndex: number, event: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const halfStar = x < rect.width / 2;
-    const value = halfStar ? starIndex - 0.5 : starIndex;
-    setHoverRating(value);
+  const handleStarHover = (star: number, event: React.MouseEvent) => {
+    if (!hasUserRated) {
+      const rect = (event.target as HTMLElement).getBoundingClientRect();
+      const percentage = (event.clientX - rect.left) / rect.width;
+      const rating = star - 0.5 + percentage;
+      setHoverRating(Math.max(0.5, Math.min(star, rating)));
+    }
   };
 
   // Only update from props if we didn't trigger the change ourselves
@@ -104,16 +103,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       default:
         return '/mountain-default.jpg';
     }
-  };
-
-  const getStarClipPath = (star: number, rating?: number): string => {
-    if (!rating) return '0 0, 0 0';
-    if (rating >= star) return '0 0, 100% 0, 100% 100%, 0 100%';
-    if (rating > star - 1) {
-      const percentage = (rating - (star - 1)) * 100;
-      return `0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%`;
-    }
-    return '0 0, 0 0';
   };
 
   const handleSubmitRating = async () => {
@@ -180,28 +169,15 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   };
 
   useEffect(() => {
-    const updateTooltipPosition = () => {
-      if (buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
-        setTooltipPosition({
-          x: rect.left + rect.width / 2,
-          y: rect.top
-        });
+    const handleClickOutside = (event: MouseEvent) => {
+      if (buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
+        setShowRatingPanel(false);
       }
     };
 
-    const observer = new ResizeObserver(updateTooltipPosition);
-    if (buttonRef.current) {
-      observer.observe(buttonRef.current);
-    }
-
-    window.addEventListener('scroll', updateTooltipPosition, true);
-    window.addEventListener('resize', updateTooltipPosition);
-
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      observer.disconnect();
-      window.removeEventListener('scroll', updateTooltipPosition, true);
-      window.removeEventListener('resize', updateTooltipPosition);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
