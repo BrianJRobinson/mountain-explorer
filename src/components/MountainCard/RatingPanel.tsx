@@ -8,6 +8,7 @@ interface RatingPanelProps {
   comment: string;
   userComment?: string;
   isSubmitting: boolean;
+  readOnly?: boolean;
   onClose: () => void;
   onRatingChange: (rating: number) => void;
   onCommentChange: (comment: string) => void;
@@ -21,6 +22,7 @@ export const RatingPanel: React.FC<RatingPanelProps> = ({
   comment,
   userComment,
   isSubmitting,
+  readOnly = false,
   onClose,
   onRatingChange,
   onCommentChange,
@@ -31,7 +33,7 @@ export const RatingPanel: React.FC<RatingPanelProps> = ({
       {/* Rating Panel Header */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-medium text-white">
-          {hasUserRated ? "Your Rating" : "Rate & Comment"}
+          {readOnly ? "Your Rating" : "Rate & Comment"}
         </h3>
         <button
           onClick={onClose}
@@ -46,27 +48,27 @@ export const RatingPanel: React.FC<RatingPanelProps> = ({
       {/* Star Rating */}
       <div className="flex items-center justify-center mb-3">
         <StarRating
-          rating={hasUserRated ? userRating : selectedRating}
-          interactive={!hasUserRated}
-          disabled={hasUserRated}
+          rating={selectedRating}
+          interactive={!readOnly}
+          disabled={readOnly}
           size="lg"
-          onChange={onRatingChange}
+          onChange={readOnly ? undefined : onRatingChange}
         />
       </div>
       
       {/* Comment Textarea */}
       <textarea
-        placeholder={hasUserRated ? "Your previous comment" : "Add a comment..."}
-        value={hasUserRated ? (userComment || '') : comment}
-        onChange={(e) => !hasUserRated && onCommentChange(e.target.value)}
-        disabled={hasUserRated}
+        placeholder={readOnly ? '' : "Share your experience with this mountain (optional)"}
+        value={comment}
+        onChange={(e) => onCommentChange(e.target.value)}
+        disabled={readOnly}
         className={`flex-1 w-full px-3 py-1.5 bg-gray-700 text-sm text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-          hasUserRated ? 'opacity-75 cursor-not-allowed' : ''
+          readOnly ? 'opacity-75 cursor-not-allowed' : ''
         }`}
       />
       
       {/* Submit Button */}
-      {!hasUserRated && (
+      {!readOnly && (
         <button 
           onClick={onSubmit}
           disabled={!selectedRating || isSubmitting}

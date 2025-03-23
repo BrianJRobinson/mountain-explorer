@@ -13,6 +13,10 @@ import { MountainCardHeader } from './MountainCard/MountainCardHeader';
 import { MountainDetails } from './MountainCard/MountainDetails';
 import { RatingPanel } from './MountainCard/RatingPanel';
 import { MountainCardFooter } from './MountainCard/MountainCardFooter';
+import { MountainMap } from './MountainCard/MountainMap';
+import { CompletionModal } from './MountainCard/CompletionModal';
+import { CommentsModal } from './MountainCard/CommentsModal';
+import { useRouter } from 'next/navigation';
 
 interface MountainCardProps {
   mountain: Mountain;
@@ -80,6 +84,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   onMapMarkerClick,
 }) => {
   const { data: session } = useSession();
+  const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentState, setCurrentState] = useState(isCompleted);
   const [showRatingPanel, setShowRatingPanel] = useState(false);
@@ -170,8 +175,8 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       // Keep our flag true since the API succeeded
       ignoreNextPropChange.current = true;
       
-      // If marking as completed, show the rating panel
-      if (newState) {
+      // Only show rating panel if marking as completed AND hasn't rated yet
+      if (newState && !hasUserRated) {
         setShowRatingPanel(true);
       }
     } catch {
@@ -510,7 +515,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
             title="Reset View"
           >
             <svg class="w-4 h-4 text-gray-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 100-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
             </svg>
           </button>
         </div>
@@ -706,53 +711,32 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     };
   }, [showMap, is3DMode, mountainData.ukHillsDbLatitude, mountainData.ukHillsDbLongitude, mountainData.ukHillsDbName, mountainData.id, allMountains, onMapMarkerClick, initialize3DMap]);
 
-  // Function to render the map modal
-  const renderMapModal = () => {
-    if (!showMap) return null;
+  // Handle completion toggle
+  const handleCompletionToggle = async () => {
+    if (!session?.user || isUpdating) return;
 
-    return createPortal(
-      <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 md:p-0"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setShowMap(false);
-          }
-        }}
-      >
-        <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-4xl">
-          <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-medium text-white">{mountainData.ukHillsDbName} - Location Map</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-300">3D</span>
-                <ToggleButton
-                  isToggled={is3DMode}
-                  onToggle={() => setIs3DMode(!is3DMode)}
-                  size="sm"
-                  label={is3DMode ? 'Switch to 2D view' : 'Switch to 3D view'}
-                />
-              </div>
-            </div>
-            <button
-              onClick={() => setShowMap(false)}
-              className="text-gray-400 hover:text-white transition-colors p-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="p-4">
-            <div 
-              ref={mapContainer} 
-              className="w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden bg-gray-700"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
+    try {
+      setIsSubmitting(true);
+      const newCompletionStatus = !currentState;
+      
+      // Update completion status
+      await processToggle(newCompletionStatus);
+      
+      // Only show rating panel if marking as completed AND hasn't rated yet
+      if (newCompletionStatus && !hasUserRated) {
+        setShowRatingPanel(true);
+      }
+    } catch (error) {
+      console.error('Error updating completion status:', error);
+      toast.error('Failed to update completion status');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle showing rating panel from footer button
+  const handleShowRatingPanel = () => {
+    setShowRatingPanel(true);
   };
 
   return (
@@ -794,7 +778,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
           isCompleted={currentState}
           isUpdating={isUpdating}
           showToggle={!!session?.user}
-          onToggleCompletion={handleToggle}
+          onToggleCompletion={handleCompletionToggle}
         />
 
         {/* Content Section - Fixed height */}
@@ -802,15 +786,16 @@ export const MountainCard: React.FC<MountainCardProps> = ({
           {showRatingPanel ? (
             <RatingPanel
               hasUserRated={hasUserRated}
-              userRating={mountainData.userRating}
-              selectedRating={selectedRating}
-              comment={comment}
+              userRating={userRating}
+              selectedRating={hasUserRated ? userRating : selectedRating}
+              comment={hasUserRated ? mountainData.userComment || '' : comment}
               userComment={mountainData.userComment}
               isSubmitting={isSubmitting}
               onClose={() => setShowRatingPanel(false)}
               onRatingChange={setSelectedRating}
               onCommentChange={setComment}
               onSubmit={handleSubmitRating}
+              readOnly={hasUserRated}
             />
           ) : (
             <div className="h-full p-4 flex flex-col">
@@ -831,97 +816,38 @@ export const MountainCard: React.FC<MountainCardProps> = ({
                 isUserLoggedIn={!!session?.user}
                 hasUserRated={hasUserRated}
                 onShowComments={() => setShowComments(true)}
-                onShowRatingPanel={() => setShowRatingPanel(true)}
+                onShowRatingPanel={handleShowRatingPanel}
               />
             </div>
           )}
         </div>
-
-        {/* Completion Confirmation Modal */}
-        {showCompletionModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
-            <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-md mx-4">
-              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-                <h3 className="text-lg font-medium text-white">Congratulations</h3>
-                <button
-                  onClick={() => {
-                    setShowCompletionModal(false);
-                    processToggle(true);
-                  }}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-4">
-                <p className="text-gray-300 mb-4">
-                  Congratulations on your climb up {mountainData.ukHillsDbName}! Would you like to rate and comment on your experience?
-                </p>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => {
-                      setShowCompletionModal(false);
-                      processToggle(true);
-                    }}
-                    className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
-                  >
-                    Skip
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowCompletionModal(false);
-                      processToggle(true);
-                      setShowRatingPanel(true);
-                    }}
-                    className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                  >
-                    Rate & Comment
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Comments Modal */}
-        {showComments && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-lg mx-4">
-              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-                <h3 className="text-lg font-medium text-white">Recent Comments</h3>
-                <button
-                  onClick={() => setShowComments(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
-                {recentComments.map((comment, index) => (
-                  <div key={index} className="text-sm">
-                    <div className="mb-2">
-                      <span className="text-orange-400 font-medium">{comment.userName || 'Anonymous'}</span>
-                      <div className="flex items-center gap-1 mt-1">
-                        <StarRating
-                          rating={comment.rating}
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                    <p className="text-gray-300">{comment.comment}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-      {/* Render map modal through portal */}
-      {renderMapModal()}
+      
+      {/* Modals */}
+      <MountainMap
+        isOpen={showMap}
+        onClose={() => setShowMap(false)}
+        mountain={mountain}
+        allMountains={allMountains}
+        onMountainSelect={onMapMarkerClick}
+      />
+
+      <CompletionModal
+        isOpen={showCompletionModal}
+        mountainName={mountainData.ukHillsDbName}
+        onClose={() => setShowCompletionModal(false)}
+        onConfirm={() => setShowCompletionModal(false)}
+        onRateAndComment={() => {
+          setShowCompletionModal(false);
+          setShowRatingPanel(true);
+        }}
+      />
+
+      <CommentsModal
+        isOpen={showComments}
+        onClose={() => setShowComments(false)}
+        comments={recentComments}
+      />
     </>
   );
 }; 
