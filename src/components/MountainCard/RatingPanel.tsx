@@ -1,0 +1,84 @@
+import React from 'react';
+import { StarRating } from '../shared/StarRating';
+
+interface RatingPanelProps {
+  hasUserRated: boolean;
+  userRating?: number;
+  selectedRating?: number;
+  comment: string;
+  userComment?: string;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onRatingChange: (rating: number) => void;
+  onCommentChange: (comment: string) => void;
+  onSubmit: () => void;
+}
+
+export const RatingPanel: React.FC<RatingPanelProps> = ({
+  hasUserRated,
+  userRating,
+  selectedRating,
+  comment,
+  userComment,
+  isSubmitting,
+  onClose,
+  onRatingChange,
+  onCommentChange,
+  onSubmit,
+}) => {
+  return (
+    <div className="h-full p-4 flex flex-col">
+      {/* Rating Panel Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-medium text-white">
+          {hasUserRated ? "Your Rating" : "Rate & Comment"}
+        </h3>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-white transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      
+      {/* Star Rating */}
+      <div className="flex items-center justify-center mb-3">
+        <StarRating
+          rating={hasUserRated ? userRating : selectedRating}
+          interactive={!hasUserRated}
+          disabled={hasUserRated}
+          size="lg"
+          onChange={onRatingChange}
+        />
+      </div>
+      
+      {/* Comment Textarea */}
+      <textarea
+        placeholder={hasUserRated ? "Your previous comment" : "Add a comment..."}
+        value={hasUserRated ? (userComment || '') : comment}
+        onChange={(e) => !hasUserRated && onCommentChange(e.target.value)}
+        disabled={hasUserRated}
+        className={`flex-1 w-full px-3 py-1.5 bg-gray-700 text-sm text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+          hasUserRated ? 'opacity-75 cursor-not-allowed' : ''
+        }`}
+      />
+      
+      {/* Submit Button */}
+      {!hasUserRated && (
+        <button 
+          onClick={onSubmit}
+          disabled={!selectedRating || isSubmitting}
+          className={`w-full py-1.5 mt-2 text-sm rounded-lg transition-colors ${
+            !selectedRating || isSubmitting
+              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              : 'bg-orange-500 text-white hover:bg-orange-600'
+          }`}
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit'}
+        </button>
+      )}
+    </div>
+  );
+}; 
