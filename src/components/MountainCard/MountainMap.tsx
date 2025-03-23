@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import type { Map as LeafletMap, Marker } from 'leaflet';
+import type { Map as LeafletMap } from 'leaflet';
 import type { Map as MapLibreMap, MapOptions } from 'maplibre-gl';
 import { ToggleButton } from '../shared/ToggleButton';
 import { Mountain } from '@/app/types/Mountain';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MountainMapProps {
   isOpen: boolean;
@@ -415,7 +416,7 @@ export const MountainMap: React.FC<MountainMapProps> = ({
             ]);
           });
           // Fit the map to show all markers with some padding
-          map.current?.fitBounds(bounds, {
+          map.fitBounds(bounds, {
             padding: [50, 50],
             maxZoom: 10
           });

@@ -2,11 +2,8 @@ import React from 'react';
 import { StarRating } from '../shared/StarRating';
 
 interface RatingPanelProps {
-  hasUserRated: boolean;
-  userRating?: number;
   selectedRating?: number;
   comment: string;
-  userComment?: string;
   isSubmitting: boolean;
   readOnly?: boolean;
   onClose: () => void;
@@ -16,11 +13,8 @@ interface RatingPanelProps {
 }
 
 export const RatingPanel: React.FC<RatingPanelProps> = ({
-  hasUserRated,
-  userRating,
   selectedRating,
   comment,
-  userComment,
   isSubmitting,
   readOnly = false,
   onClose,

@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { MountainCard } from './MountainCard';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 interface MountainDirectoryProps {
   mountains: Mountain[];
@@ -155,6 +155,32 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const handleMapMarkerClick = (mountainName: string) => {
     setSearchQuery(mountainName);
     setDebouncedSearch(mountainName);
+  };
+
+  const handleSubmitRating = async (mountainId: number, rating: number, comment: string) => {
+    try {
+      const response = await fetch('/api/mountains/rate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mountainId,
+          rating,
+          comment: comment.trim() || null
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to submit rating');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      throw error;
+    }
   };
 
   const filteredMountains = mountains.filter(mountain => {
@@ -312,6 +338,7 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
                       isInitialLoading={status === 'authenticated' && isLoadingCompletions}
                       allMountains={mountains}
                       onMapMarkerClick={handleMapMarkerClick}
+                      onSubmitRating={handleSubmitRating}
                     />
                   ))}
                 </div>

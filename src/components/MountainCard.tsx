@@ -4,11 +4,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
 import { toast } from 'react-hot-toast';
-import { createPortal } from 'react-dom';
-import type { Map as LeafletMap, Marker } from 'leaflet';
+import type { Map as LeafletMap } from 'leaflet';
 import type { Map as MapLibreMap, MapOptions } from 'maplibre-gl';
-import { ToggleButton } from './shared/ToggleButton';
-import { StarRating } from './shared/StarRating';
 import { MountainCardHeader } from './MountainCard/MountainCardHeader';
 import { MountainDetails } from './MountainCard/MountainDetails';
 import { RatingPanel } from './MountainCard/RatingPanel';
@@ -16,7 +13,6 @@ import { MountainCardFooter } from './MountainCard/MountainCardFooter';
 import { MountainMap } from './MountainCard/MountainMap';
 import { CompletionModal } from './MountainCard/CompletionModal';
 import { CommentsModal } from './MountainCard/CommentsModal';
-import { useRouter } from 'next/navigation';
 
 interface MountainCardProps {
   mountain: Mountain;
@@ -25,6 +21,7 @@ interface MountainCardProps {
   isInitialLoading?: boolean;
   allMountains: Mountain[];
   onMapMarkerClick?: (mountainName: string) => void;
+  onSubmitRating: (mountainId: number, rating: number, comment: string) => Promise<void>;
 }
 
 // Dynamic imports for mapping libraries
@@ -77,69 +74,41 @@ if (typeof window !== 'undefined') {
 
 export const MountainCard: React.FC<MountainCardProps> = ({
   mountain,
-  isCompleted = false,
+  isCompleted: initialIsCompleted = false,
   onToggleCompletion,
   isInitialLoading = false,
-  allMountains = [],
+  allMountains,
   onMapMarkerClick,
+  onSubmitRating,
 }) => {
   const { data: session } = useSession();
-  const router = useRouter();
+  const [currentState, setCurrentState] = useState(initialIsCompleted);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [currentState, setCurrentState] = useState(isCompleted);
   const [showRatingPanel, setShowRatingPanel] = useState(false);
-  const [selectedRating, setSelectedRating] = useState<number | undefined>(undefined);
-  const [hoverRating, setHoverRating] = useState<number | undefined>(undefined);
+  const [selectedRating, setSelectedRating] = useState<number>();
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [mountainData, setMountainData] = useState(mountain);
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<LeafletMap | null>(null);
-  const marker = useRef<Marker | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [is3DMode] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const ignoreNextPropChange = useRef(false);
-  const categoryName = mountainData.MountainCategoryID === 12 ? 'Munro' : 'Corbett';
+
+  // Derived state
+  const mountainData = mountain;
   const rating = mountainData.averageRating;
-  const hasUserRated = mountainData.userRating !== undefined;
+  const hasUserRated = !!mountainData.userRating;
   const userRating = mountainData.userRating;
   const recentComments = mountainData.recentComments || [];
-  const [is3DMode, setIs3DMode] = useState(false);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<LeafletMap | null>(null);
   const maplibreMap = useRef<MapLibreMap | null>(null);
   const markers3D = useRef<maplibregl.Marker[]>([]);
 
   // Update mountainData when mountain prop changes
   useEffect(() => {
-    setMountainData(mountain);
-  }, [mountain]);
-
-  const handleStarClick = (starIndex: number, event: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const halfStar = x < rect.width / 2;
-    const value = halfStar ? starIndex - 0.5 : starIndex;
-    setSelectedRating(value);
-  };
-
-  const handleStarHover = (star: number, event: React.MouseEvent) => {
-    if (!hasUserRated) {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
-      const percentage = (event.clientX - rect.left) / rect.width;
-      const rating = star - 0.5 + percentage;
-      setHoverRating(Math.max(0.5, Math.min(star, rating)));
-    }
-  };
-
-  // Only update from props if we didn't trigger the change ourselves
-  useEffect(() => {
-    if (ignoreNextPropChange.current) {
-      ignoreNextPropChange.current = false;
-      return;
-    }
-    setCurrentState(isCompleted);
-  }, [isCompleted]);
+    setCurrentState(initialIsCompleted);
+  }, [initialIsCompleted]);
 
   const handleToggle = async () => {
     if (!session?.user || isUpdating) return;
@@ -189,97 +158,26 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     }
   };
 
-  const getCategoryImage = (categoryId: number) => {
-    switch (categoryId) {
-      case 11:
-        return '/mountain-category-11.jpg';
-      case 12:
-        return '/mountain-category-12.jpg';
-      default:
-        return '/mountain-default.jpg';
-    }
-  };
-
   const handleSubmitRating = async () => {
-    if (!selectedRating || !session?.user?.id) {
-      toast.error('Please select a rating before submitting');
-      return;
-    }
-    
+    if (!selectedRating) return;
+
     try {
       setIsSubmitting(true);
-      const response = await fetch('/api/mountains/rate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mountainId: mountainData.id,
-          rating: selectedRating,
-          comment: comment.trim() || null
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to submit rating');
-      }
-
-      // Create a new mountain data object with updated values
-      const updatedMountain = { ...mountainData };
-      updatedMountain.userRating = selectedRating;
-      updatedMountain.userComment = comment.trim() || undefined;
+      await onSubmitRating(mountainData.id, selectedRating, comment);
       
-      if (comment.trim()) {
-        updatedMountain.recentComments = [{
-          rating: selectedRating,
-          comment: comment.trim() || null,
-          createdAt: new Date().toISOString(),
-          userName: session.user.name || null
-        }, ...(mountainData.recentComments || []).slice(0, 4)];
-      }
-
-      // Recalculate average rating
-      const newTotalRatings = (mountainData.totalRatings || 0) + (mountainData.userRating === undefined ? 1 : 0);
-      const oldRatingSum = (mountainData.averageRating || 0) * (mountainData.totalRatings || 0);
-      const newRatingSum = oldRatingSum + (mountainData.userRating === undefined ? selectedRating : (selectedRating - (mountainData.userRating || 0)));
-      updatedMountain.averageRating = newRatingSum / newTotalRatings;
-      updatedMountain.totalRatings = newTotalRatings;
-
-      // Update the state with the new mountain data
-      setMountainData(updatedMountain);
-
-      // If not already completed, mark as completed
-      if (!currentState) {
-        await processToggle(true);
-      }
-
+      // Update the state
+      setCurrentState(true);
+      setIsUpdating(true);
+      
       toast.success('Rating submitted successfully!');
       setShowRatingPanel(false);
-      // Reset form
-      setSelectedRating(undefined);
-      setComment('');
     } catch (error) {
       console.error('Error submitting rating:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit rating. Please try again.');
+      toast.error('Failed to submit rating');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
-        setShowRatingPanel(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   // Initialize 3D map
   const initialize3DMap = useCallback(() => {
@@ -289,7 +187,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     if (map.current) {
       map.current.remove();
       map.current = null;
-      marker.current = null;
     }
 
     // Clean up existing 3D map if it exists
@@ -572,7 +469,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       if (map.current) {
         map.current.remove();
         map.current = null;
-        marker.current = null;
       }
       
       const lat = parseFloat(mountainData.ukHillsDbLatitude);
@@ -699,7 +595,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       } else if (map.current) {
         map.current.remove();
         map.current = null;
-        marker.current = null;
       }
       // Restore scrolling when modal is closed
       document.body.style.overflow = 'unset';
@@ -711,143 +606,115 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     };
   }, [showMap, is3DMode, mountainData.ukHillsDbLatitude, mountainData.ukHillsDbLongitude, mountainData.ukHillsDbName, mountainData.id, allMountains, onMapMarkerClick, initialize3DMap]);
 
-  // Handle completion toggle
-  const handleCompletionToggle = async () => {
-    if (!session?.user || isUpdating) return;
-
-    try {
-      setIsSubmitting(true);
-      const newCompletionStatus = !currentState;
-      
-      // Update completion status
-      await processToggle(newCompletionStatus);
-      
-      // Only show rating panel if marking as completed AND hasn't rated yet
-      if (newCompletionStatus && !hasUserRated) {
-        setShowRatingPanel(true);
-      }
-    } catch (error) {
-      console.error('Error updating completion status:', error);
-      toast.error('Failed to update completion status');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle showing rating panel from footer button
-  const handleShowRatingPanel = () => {
-    setShowRatingPanel(true);
-  };
-
   return (
-    <>
-      <div className={`
-        group relative bg-gray-800 rounded-xl overflow-hidden h-full
-        border border-orange-500/20 hover:border-orange-500/40
-        shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)] hover:shadow-[0_0_25px_-5px_rgba(249,115,22,0.2)]
-        ${isInitialLoading ? 'animate-pulse blur-[2px]' : ''}
-      `}>
-        {isInitialLoading && (
-          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
-            <svg
-              className="w-8 h-8 animate-spin text-orange-500"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+    <div className={`
+      group relative bg-gray-800 rounded-xl overflow-hidden h-full
+      border border-orange-500/20 hover:border-orange-500/40
+      shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)] hover:shadow-[0_0_25px_-5px_rgba(249,115,22,0.2)]
+      ${isInitialLoading ? 'animate-pulse blur-[2px]' : ''}
+    `}>
+      {isInitialLoading && (
+        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <svg
+            className="w-8 h-8 animate-spin text-orange-500"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+        </div>
+      )}
+      
+      <MountainCardHeader
+        name={mountainData.ukHillsDbName}
+        categoryId={mountainData.MountainCategoryID}
+        isCompleted={currentState}
+        isUpdating={isUpdating}
+        showToggle={!!session?.user}
+        onToggleCompletion={handleToggle}
+      />
+
+      {/* Content Section - Fixed height */}
+      <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
+        {showRatingPanel ? (
+          <RatingPanel
+            selectedRating={hasUserRated ? userRating : selectedRating}
+            comment={hasUserRated ? (mountainData.userComment || '') : comment}
+            isSubmitting={isSubmitting}
+            readOnly={hasUserRated}
+            onClose={() => setShowRatingPanel(false)}
+            onRatingChange={setSelectedRating}
+            onCommentChange={setComment}
+            onSubmit={handleSubmitRating}
+          />
+        ) : (
+          <div className="h-full p-4 flex flex-col">
+            {/* Mountain Details Content */}
+            <MountainDetails
+              height={mountainData.Height}
+              latitude={mountainData.ukHillsDbLatitude}
+              longitude={mountainData.ukHillsDbLongitude}
+              region={mountainData.ukHillsDbSection}
+              onShowMap={() => setShowMap(true)}
+            />
+
+            {/* Rating Stars and Comment Button */}
+            <MountainCardFooter
+              rating={rating}
+              totalRatings={mountainData.totalRatings}
+              hasRecentComments={recentComments.length > 0}
+              isUserLoggedIn={!!session?.user}
+              hasUserRated={hasUserRated}
+              onShowComments={() => setShowComments(true)}
+              onShowRatingPanel={() => setShowRatingPanel(true)}
+            />
           </div>
         )}
-        
-        <MountainCardHeader
-          name={mountainData.ukHillsDbName}
-          categoryId={mountainData.MountainCategoryID}
-          isCompleted={currentState}
-          isUpdating={isUpdating}
-          showToggle={!!session?.user}
-          onToggleCompletion={handleCompletionToggle}
-        />
-
-        {/* Content Section - Fixed height */}
-        <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
-          {showRatingPanel ? (
-            <RatingPanel
-              hasUserRated={hasUserRated}
-              userRating={userRating}
-              selectedRating={hasUserRated ? userRating : selectedRating}
-              comment={hasUserRated ? mountainData.userComment || '' : comment}
-              userComment={mountainData.userComment}
-              isSubmitting={isSubmitting}
-              onClose={() => setShowRatingPanel(false)}
-              onRatingChange={setSelectedRating}
-              onCommentChange={setComment}
-              onSubmit={handleSubmitRating}
-              readOnly={hasUserRated}
-            />
-          ) : (
-            <div className="h-full p-4 flex flex-col">
-              {/* Mountain Details Content */}
-              <MountainDetails
-                height={mountainData.Height}
-                latitude={mountainData.ukHillsDbLatitude}
-                longitude={mountainData.ukHillsDbLongitude}
-                region={mountainData.ukHillsDbSection}
-                onShowMap={() => setShowMap(true)}
-              />
-
-              {/* Rating Stars and Comment Button */}
-              <MountainCardFooter
-                rating={rating}
-                totalRatings={mountainData.totalRatings}
-                hasRecentComments={recentComments.length > 0}
-                isUserLoggedIn={!!session?.user}
-                hasUserRated={hasUserRated}
-                onShowComments={() => setShowComments(true)}
-                onShowRatingPanel={handleShowRatingPanel}
-              />
-            </div>
-          )}
-        </div>
       </div>
-      
-      {/* Modals */}
-      <MountainMap
-        isOpen={showMap}
-        onClose={() => setShowMap(false)}
-        mountain={mountain}
-        allMountains={allMountains}
-        onMountainSelect={onMapMarkerClick}
-      />
 
-      <CompletionModal
-        isOpen={showCompletionModal}
-        mountainName={mountainData.ukHillsDbName}
-        onClose={() => setShowCompletionModal(false)}
-        onConfirm={() => setShowCompletionModal(false)}
-        onRateAndComment={() => {
-          setShowCompletionModal(false);
-          setShowRatingPanel(true);
-        }}
-      />
+      {showMap && (
+        <MountainMap
+          isOpen={showMap}
+          onClose={() => setShowMap(false)}
+          mountain={mountain}
+          allMountains={allMountains}
+          onMountainSelect={onMapMarkerClick}
+        />
+      )}
 
-      <CommentsModal
-        isOpen={showComments}
-        onClose={() => setShowComments(false)}
-        comments={recentComments}
-      />
-    </>
+      {showCompletionModal && (
+        <CompletionModal
+          isOpen={showCompletionModal}
+          mountainName={mountainData.ukHillsDbName}
+          onConfirm={() => setShowCompletionModal(false)}
+          onSkip={() => setShowCompletionModal(false)}
+          onRateAndComment={() => {
+            setShowCompletionModal(false);
+            setShowRatingPanel(true);
+          }}
+        />
+      )}
+
+      {showComments && (
+        <CommentsModal
+          isOpen={showComments}
+          onClose={() => setShowComments(false)}
+          comments={recentComments}
+        />
+      )}
+    </div>
   );
 }; 

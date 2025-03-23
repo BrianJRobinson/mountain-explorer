@@ -3,16 +3,16 @@ import React from 'react';
 interface CompletionModalProps {
   isOpen: boolean;
   mountainName: string;
-  onClose: () => void;
   onConfirm: () => void;
+  onSkip: () => void;
   onRateAndComment: () => void;
 }
 
 export const CompletionModal: React.FC<CompletionModalProps> = ({
   isOpen,
   mountainName,
-  onClose,
   onConfirm,
+  onSkip,
   onRateAndComment,
 }) => {
   if (!isOpen) return null;
@@ -37,7 +37,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
           </p>
           <div className="flex justify-end gap-3">
             <button
-              onClick={onConfirm}
+              onClick={onSkip}
               className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
             >
               Skip
