@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
+import { UserAvatar } from './UserAvatar';
 
 export const Navbar = () => {
   const { data: session } = useSession();
@@ -37,25 +38,28 @@ export const Navbar = () => {
                 Mountain Explorer
               </Link>
             </div>
-            <div className="w-1/2 flex justify-end items-center">
+            <div className="w-1/2 flex justify-end items-center gap-4">
               {session?.user ? (
+                <>
+                  <UserAvatar />
                   <button
                     onClick={() => signOut()}
                     className="bg-orange-500 text-white shadow-lg transition-colors px-3 py-1.5 rounded-lg text-sm sm:text-base"
                   >
                     Sign out
                   </button>
+                </>
               ) : (
                 <>
                   <Link
                     href="/login"
-                    className="text-white hover:text-gray-300 transition-colors text-sm sm:text-base mr-4 px-3 py-1.5"
+                    className="text-white hover:text-gray-300 transition-colors text-sm sm:text-base px-3 py-1.5"
                   >
                     Sign in
                   </Link>
                   <Link
                     href="/register"
-                    className="bg-orange-500 text-white shadow-lg transition-colors px-3 py-1.5 rounded-lg text-sm sm:text-base"
+                    className="bg-orange-500 text-white shadow-lg transition-colors px-3 py-1.5 rounded-lg text-sm sm:w-full sm:text-base"
                   >
                     Register
                   </Link>

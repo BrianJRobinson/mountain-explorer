@@ -12,6 +12,7 @@ declare module 'next-auth' {
       email?: string | null;
       name?: string | null;
       image?: string | null;
+      avatar?: string | null;
     }
   }
 }
@@ -81,6 +82,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             name: user.name,
             email: user.email,
+            avatar: user.avatar,
           };
         } catch (error) {
           logger.error('Authorization error:', error);
@@ -96,12 +98,14 @@ export const authOptions: NextAuthOptions = {
     jwt: async ({ token, user }) => {
       if (user) {
         token.id = user.id;
+        token.avatar = user.avatar;
       }
       return token;
     },
     session: async ({ session, token }) => {
       if (token && session.user) {
         session.user.id = token.id as string;
+        session.user.avatar = token.avatar as string;
       }
       return session;
     }
