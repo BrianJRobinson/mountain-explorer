@@ -4,19 +4,44 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
 import { toast } from 'react-hot-toast';
+import { createPortal } from 'react-dom';
 
 interface MountainCardProps {
   mountain: Mountain;
   isCompleted?: boolean;
   onToggleCompletion: (mountainId: number, completed: boolean) => Promise<void>;
   isInitialLoading?: boolean;
+  allMountains: Mountain[];
+  onMapMarkerClick?: (mountainName: string) => void;
 }
+
+// Move Leaflet imports to a dynamic import
+let L: any;
+if (typeof window !== 'undefined') {
+  L = require('leaflet');
+  require('leaflet/dist/leaflet.css');
+}
+
+// Fix Leaflet marker icon issue
+const fixLeafletIcon = () => {
+  if (!L) return;
+  
+  // @ts-ignore - Leaflet types don't include icon properties
+  delete L.Icon.Default.prototype._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  });
+};
 
 export const MountainCard: React.FC<MountainCardProps> = ({
   mountain,
   isCompleted = false,
   onToggleCompletion,
   isInitialLoading = false,
+  allMountains = [],
+  onMapMarkerClick,
 }) => {
   const { data: session } = useSession();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -29,6 +54,10 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [mountainData, setMountainData] = useState(mountain);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<L.Map | null>(null);
+  const marker = useRef<L.Marker | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const ignoreNextPropChange = useRef(false);
   const categoryName = mountainData.MountainCategoryID === 12 ? 'Munro' : 'Corbett';
@@ -208,420 +237,601 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     };
   }, []);
 
-  return (
-    <div className={`
-      group relative bg-gray-800 rounded-xl overflow-hidden h-full
-      border border-orange-500/20 hover:border-orange-500/40
-      shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)] hover:shadow-[0_0_25px_-5px_rgba(249,115,22,0.2)]
-      ${isInitialLoading ? 'animate-pulse blur-[2px]' : ''}
-    `}>
-      {isInitialLoading && (
-        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <svg
-            className="w-8 h-8 animate-spin text-orange-500"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        </div>
-      )}
-      
-      {/* Category Badge */}
-      <div className="absolute top-4 right-4 z-20">
-        <div className="bg-orange-500 px-3 py-1 rounded-full border border-orange-600/50 shadow-lg">
-          <span className="text-sm font-medium text-gray-900">
-            {categoryName}
-          </span>
-        </div>
-      </div>
+  // Initialize map when modal opens
+  useEffect(() => {
+    if (!L || !showMap) return;
 
-      {/* Completion Toggle - Top Left */}
-      {session?.user && (
-        <div className="absolute top-4 left-3 z-20">
-          <div
-            onClick={handleToggle}
-            role="button"
-            tabIndex={0}
-            aria-pressed={currentState}
-            className={`
-              relative inline-flex items-center cursor-pointer group
-              ${isUpdating ? 'opacity-75' : ''}
-            `}
-          >
-            <div className={`
-              w-14 h-7 rounded-full 
-              transition-colors duration-200 ease-in-out
-              ${currentState ? 'bg-orange-500' : 'bg-gray-700'}
-              relative
-              ${isUpdating ? 'animate-pulse' : ''}
-            `}>
-              <div className={`
-                absolute top-1 left-1
-                w-5 h-5 rounded-full
-                transition-all duration-200 ease-in-out
-                ${currentState ? 'translate-x-7 bg-white' : 'translate-x-0 bg-gray-400'}
-                shadow-lg
-              `}>
-                {isUpdating && (
-                  <svg
-                    className="absolute inset-0 w-full h-full animate-spin text-orange-500"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                )}
-              </div>
+    // Fix scrolling when modal is open
+    document.body.style.overflow = 'hidden';
+    
+    if (mapContainer.current && !map.current) {
+      // Fix Leaflet icon paths
+      fixLeafletIcon();
+      
+      const lat = parseFloat(mountainData.ukHillsDbLatitude);
+      const lng = parseFloat(mountainData.ukHillsDbLongitude);
+
+      // Initialize map centered on the current mountain with closer zoom
+      map.current = L.map(mapContainer.current, {
+        scrollWheelZoom: true,
+        zoomControl: true,
+      }).setView([lat, lng], 13);
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map.current);
+
+      // Add custom zoom control
+      const zoomAllButton = L.Control.extend({
+        options: {
+          position: 'topleft'
+        },
+
+        onAdd: function(map: any) {
+          const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+          const button = L.DomUtil.create('a', '', container);
+          button.innerHTML = `
+            <div class="w-[30px] h-[30px] bg-white flex items-center justify-center cursor-pointer hover:bg-gray-100" title="View All Nearby">
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm14 0H3v12h14V3z" clip-rule="evenodd"/>
+                <path fill-rule="evenodd" d="M13 7a1 1 0 10-2 0v1H9a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/>
+              </svg>
             </div>
-            <span className="sr-only">
-              {currentState ? 'Mark as not completed' : 'Mark as completed'}
+          `;
+          
+          L.DomEvent.on(button, 'click', function(e: Event) {
+            L.DomEvent.stopPropagation(e);
+            // Create bounds object to fit all markers
+            const bounds = L.latLngBounds([]);
+            allMountains.forEach(m => {
+              bounds.extend([
+                parseFloat(m.ukHillsDbLatitude),
+                parseFloat(m.ukHillsDbLongitude)
+              ]);
+            });
+            // Fit the map to show all markers with some padding
+            map.fitBounds(bounds, {
+              padding: [50, 50],
+              maxZoom: 10
+            });
+          });
+
+          return container;
+        }
+      });
+
+      // Create markers for all mountains
+      const markers = new Map<number, typeof L.Marker>();
+      
+      allMountains.forEach((m) => {
+        const mLat = parseFloat(m.ukHillsDbLatitude);
+        const mLng = parseFloat(m.ukHillsDbLongitude);
+        
+        const marker = L.marker([mLat, mLng])
+          .addTo(map.current!)
+          .bindPopup(
+            `<div class="text-center">
+              <strong>${m.ukHillsDbName}</strong><br/>
+              ${m.Height}m - ${m.MountainCategoryID === 12 ? 'Munro' : 'Corbett'}<br/>
+              <button 
+                onclick="window.dispatchEvent(new CustomEvent('mountain-selected', { detail: '${m.ukHillsDbName}' }))"
+                class="px-2 py-1 mt-2 bg-orange-500 text-white rounded-md text-sm cursor-pointer hover:bg-orange-600"
+              >
+                Show Details
+              </button>
+            </div>`,
+            {
+              className: 'mountain-popup'
+            }
+          );
+
+        // Highlight the current mountain's marker
+        if (m.id === mountainData.id) {
+          marker.setZIndexOffset(1000); // Bring to front
+          marker.openPopup();
+        }
+
+        markers.set(m.id, marker);
+      });
+
+      // Add the zoom control to the map
+      map.current.addControl(new zoomAllButton());
+
+      // Force a resize after a short delay to ensure the container is visible
+      setTimeout(() => {
+        if (map.current) {
+          map.current.invalidateSize();
+        }
+      }, 100);
+
+      // Add event listener for mountain selection
+      const handleMountainSelected = (event: CustomEvent) => {
+        if (onMapMarkerClick) {
+          onMapMarkerClick(event.detail);
+          setShowMap(false);
+        }
+      };
+
+      window.addEventListener('mountain-selected', handleMountainSelected as EventListener);
+
+      return () => {
+        window.removeEventListener('mountain-selected', handleMountainSelected as EventListener);
+      };
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+        marker.current = null;
+      }
+      // Restore scrolling when modal is closed
+      document.body.style.overflow = 'unset';
+    };
+  }, [showMap, mountainData.ukHillsDbLatitude, mountainData.ukHillsDbLongitude, mountainData.ukHillsDbName, mountainData.id, allMountains, onMapMarkerClick]);
+
+  // Function to render the map modal
+  const renderMapModal = () => {
+    if (!showMap) return null;
+
+    return createPortal(
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 md:p-0"
+        onClick={(e) => {
+          // Close modal when clicking the backdrop
+          if (e.target === e.currentTarget) {
+            setShowMap(false);
+          }
+        }}
+      >
+        <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-4xl">
+          <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+            <h3 className="text-lg font-medium text-white">{mountainData.ukHillsDbName} - Location Map</h3>
+            <button
+              onClick={() => setShowMap(false)}
+              className="text-gray-400 hover:text-white transition-colors p-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-4">
+            <div 
+              ref={mapContainer} 
+              className="w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden bg-gray-700"
+              onClick={(e) => e.stopPropagation()} // Prevent clicks on map from closing modal
+            />
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
+  return (
+    <>
+      <div className={`
+        group relative bg-gray-800 rounded-xl overflow-hidden h-full
+        border border-orange-500/20 hover:border-orange-500/40
+        shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)] hover:shadow-[0_0_25px_-5px_rgba(249,115,22,0.2)]
+        ${isInitialLoading ? 'animate-pulse blur-[2px]' : ''}
+      `}>
+        {isInitialLoading && (
+          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+            <svg
+              className="w-8 h-8 animate-spin text-orange-500"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+          </div>
+        )}
+        
+        {/* Category Badge */}
+        <div className="absolute top-4 right-4 z-20">
+          <div className="bg-orange-500 px-3 py-1 rounded-full border border-orange-600/50 shadow-lg">
+            <span className="text-sm font-medium text-gray-900">
+              {categoryName}
             </span>
           </div>
         </div>
-      )}
 
-      <div className="h-38 bg-cover bg-center relative"
-        style={{
-          backgroundImage: `url(${getCategoryImage(mountainData.MountainCategoryID)})`
-        }}
-      >
-        {/* Gradient overlay that becomes more transparent on hover */}
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent opacity-90 group-hover:opacity-75 transition-opacity duration-300 z-10" />
-        
-        {/* Mountain name with glow effect */}
-        <div className="absolute -bottom-2 left-0 right-0 p-4 z-20">
-          <h3 className="text-xl font-bold text-white drop-shadow-lg group-hover:text-orange-100 transition-colors duration-300">
-            {mountainData.ukHillsDbName}
-          </h3>
-        </div>
-      </div>
-
-      {/* Content Section - Fixed height */}
-      <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
-        {showRatingPanel ? (
-          <div className="h-full p-4 flex flex-col">
-            {/* Rating Panel Content */}
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-medium text-white">
-                {hasUserRated ? "Your Rating" : "Rate & Comment"}
-              </h3>
-              <button
-                onClick={() => setShowRatingPanel(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+        {/* Completion Toggle - Top Left */}
+        {session?.user && (
+          <div className="absolute top-4 left-3 z-20">
+            <div
+              onClick={handleToggle}
+              role="button"
+              tabIndex={0}
+              aria-pressed={currentState}
+              className={`
+                relative inline-flex items-center cursor-pointer group
+                ${isUpdating ? 'opacity-75' : ''}
+              `}
+            >
+              <div className={`
+                w-14 h-7 rounded-full 
+                transition-colors duration-200 ease-in-out
+                ${currentState ? 'bg-orange-500' : 'bg-gray-700'}
+                relative
+                ${isUpdating ? 'animate-pulse' : ''}
+              `}>
+                <div className={`
+                  absolute top-1 left-1
+                  w-5 h-5 rounded-full
+                  transition-all duration-200 ease-in-out
+                  ${currentState ? 'translate-x-7 bg-white' : 'translate-x-0 bg-gray-400'}
+                  shadow-lg
+                `}>
+                  {isUpdating && (
+                    <svg
+                      className="absolute inset-0 w-full h-full animate-spin text-orange-500"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="sr-only">
+                {currentState ? 'Mark as not completed' : 'Mark as completed'}
+              </span>
             </div>
-            
-            <div className="flex items-center justify-center gap-1 mb-3">
-              {[1, 2, 3, 4, 5].map((star) => (
+          </div>
+        )}
+
+        <div className="h-38 bg-cover bg-center relative"
+          style={{
+            backgroundImage: `url(${getCategoryImage(mountainData.MountainCategoryID)})`
+          }}
+        >
+          {/* Gradient overlay that becomes more transparent on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent opacity-90 group-hover:opacity-75 transition-opacity duration-300 z-10" />
+          
+          {/* Mountain name with glow effect */}
+          <div className="absolute -bottom-2 left-0 right-0 p-4 z-20">
+            <h3 className="text-xl font-bold text-white drop-shadow-lg group-hover:text-orange-100 transition-colors duration-300">
+              {mountainData.ukHillsDbName}
+            </h3>
+          </div>
+        </div>
+
+        {/* Content Section - Fixed height */}
+        <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
+          {showRatingPanel ? (
+            <div className="h-full p-4 flex flex-col">
+              {/* Rating Panel Content */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-medium text-white">
+                  {hasUserRated ? "Your Rating" : "Rate & Comment"}
+                </h3>
                 <button
-                  key={star}
-                  className={`relative ${hasUserRated ? 'cursor-default' : ''}`}
-                  onClick={(e) => !hasUserRated && handleStarClick(star, e)}
-                  onMouseMove={(e) => !hasUserRated && handleStarHover(star, e)}
-                  onMouseLeave={() => !hasUserRated && setHoverRating(undefined)}
-                  disabled={hasUserRated}
+                  onClick={() => setShowRatingPanel(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
                 >
-                  <svg 
-                    className={`w-8 h-8 ${
-                      hasUserRated 
-                        ? (star <= (userRating || 0) ? 'text-orange-400' : 'text-gray-600')
-                        : ((hoverRating !== undefined && star <= hoverRating) || 
-                           (hoverRating === undefined && selectedRating !== undefined && star <= selectedRating)
-                            ? 'text-orange-400'
-                            : 'text-gray-600')
-                    } transition-colors duration-200`}
-                    viewBox="0 0 20 20"
-                    style={{ fill: 'currentColor' }}
-                  >
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
-                  {/* Show half star if needed */}
-                  {(hasUserRated 
-                    ? (Math.ceil(userRating || 0) === star && !Number.isInteger(userRating || 0))
-                    : ((hoverRating !== undefined && Math.ceil(hoverRating) === star && !Number.isInteger(hoverRating)) ||
-                       (hoverRating === undefined && selectedRating !== undefined && 
-                        Math.ceil(selectedRating) === star && !Number.isInteger(selectedRating)))) && (
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-center gap-1 mb-3">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    className={`relative ${hasUserRated ? 'cursor-default' : ''}`}
+                    onClick={(e) => !hasUserRated && handleStarClick(star, e)}
+                    onMouseMove={(e) => !hasUserRated && handleStarHover(star, e)}
+                    onMouseLeave={() => !hasUserRated && setHoverRating(undefined)}
+                    disabled={hasUserRated}
+                  >
                     <svg 
-                      className="absolute inset-0 w-8 h-8 text-orange-400"
+                      className={`w-8 h-8 ${
+                        hasUserRated 
+                          ? (star <= (userRating || 0) ? 'text-orange-400' : 'text-gray-600')
+                          : ((hoverRating !== undefined && star <= hoverRating) || 
+                             (hoverRating === undefined && selectedRating !== undefined && star <= selectedRating)
+                              ? 'text-orange-400'
+                              : 'text-gray-600')
+                      } transition-colors duration-200`}
                       viewBox="0 0 20 20"
-                      style={{ 
-                        fill: 'currentColor',
-                        clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
-                      }}
+                      style={{ fill: 'currentColor' }}
                     >
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-            
-            <textarea
-              placeholder={hasUserRated ? "Your previous comment" : "Add a comment..."}
-              value={hasUserRated ? (mountainData.userComment || '') : comment}
-              onChange={(e) => !hasUserRated && setComment(e.target.value)}
-              disabled={hasUserRated}
-              className={`flex-1 w-full px-3 py-1.5 bg-gray-700 text-sm text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                hasUserRated ? 'opacity-75 cursor-not-allowed' : ''
-              }`}
-            />
-            
-            {!hasUserRated && (
-              <button 
-                onClick={handleSubmitRating}
-                disabled={!selectedRating || isSubmitting}
-                className={`w-full py-1.5 mt-2 text-sm rounded-lg transition-colors ${
-                  !selectedRating || isSubmitting
-                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    : 'bg-orange-500 text-white hover:bg-orange-600'
+                    {/* Show half star if needed */}
+                    {(hasUserRated 
+                      ? (Math.ceil(userRating || 0) === star && !Number.isInteger(userRating || 0))
+                      : ((hoverRating !== undefined && Math.ceil(hoverRating) === star && !Number.isInteger(hoverRating)) ||
+                         (hoverRating === undefined && selectedRating !== undefined && 
+                          Math.ceil(selectedRating) === star && !Number.isInteger(selectedRating)))) && (
+                      <svg 
+                        className="absolute inset-0 w-8 h-8 text-orange-400"
+                        viewBox="0 0 20 20"
+                        style={{ 
+                          fill: 'currentColor',
+                          clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
+                        }}
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+              
+              <textarea
+                placeholder={hasUserRated ? "Your previous comment" : "Add a comment..."}
+                value={hasUserRated ? (mountainData.userComment || '') : comment}
+                onChange={(e) => !hasUserRated && setComment(e.target.value)}
+                disabled={hasUserRated}
+                className={`flex-1 w-full px-3 py-1.5 bg-gray-700 text-sm text-white rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  hasUserRated ? 'opacity-75 cursor-not-allowed' : ''
                 }`}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="h-full p-4 flex flex-col">
-            {/* Mountain Details Content */}
-            <div className="space-y-3 flex-1">
-              {/* Height */}
-              <div className="flex items-center text-gray-300 group-hover:text-gray-200">
-                <svg className="w-5 h-10 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-                <span className="font-medium text-lg group-hover:text-gray-100">
-                  {mountainData.Height}m
-                </span>
-              </div>
-
-              {/* Location */}
-              <div className="flex items-center text-gray-400 group-hover:text-gray-300">
-                <svg className="w-5 h-10 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="text-sm group-hover:text-gray-200 transition-colors duration-300">
-                  {mountainData.ukHillsDbLatitude}, {mountainData.ukHillsDbLongitude}
-                </span>
-              </div>
-
-              {/* Region */}
-              <div className="flex items-center text-gray-400 group-hover:text-gray-300">
-                <svg className="w-5 h-10 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm group-hover:text-gray-200 transition-colors duration-300">
-                  Region {mountainData.ukHillsDbSection}
-                </span>
-              </div>
+              />
+              
+              {!hasUserRated && (
+                <button 
+                  onClick={handleSubmitRating}
+                  disabled={!selectedRating || isSubmitting}
+                  className={`w-full py-1.5 mt-2 text-sm rounded-lg transition-colors ${
+                    !selectedRating || isSubmitting
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : 'bg-orange-500 text-white hover:bg-orange-600'
+                  }`}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </button>
+              )}
             </div>
+          ) : (
+            <div className="h-full p-4 flex flex-col">
+              {/* Mountain Details Content */}
+              <div className="space-y-3 flex-1">
+                {/* Height */}
+                <div className="flex items-center text-gray-300 group-hover:text-gray-200">
+                  <svg className="w-5 h-10 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  <span className="font-medium text-lg group-hover:text-gray-100">
+                    {mountainData.Height}m
+                  </span>
+                </div>
 
-            {/* Rating Stars and Comment Button */}
-            <div className="pt-2 border-t border-gray-700/50 flex items-center justify-between">
-              <div className="flex items-center gap-0.5">
-                {rating === undefined ? (
-                  <span className="text-sm text-gray-500">Not Rated</span>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <svg
-                          key={star}
-                          className={`w-4 h-4 relative ${star <= Math.floor(rating) ? 'text-orange-400' : 'text-gray-600'}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          {/* Show half star if needed */}
-                          {(Math.ceil(rating) === star && !Number.isInteger(rating)) && (
-                            <svg 
-                              className="absolute inset-0 w-4 h-4 text-orange-400"
-                              viewBox="0 0 20 20"
-                              style={{ 
-                                fill: 'currentColor',
-                                clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
-                              }}
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          )}
-                        </svg>
-                      ))}
-                    </div>
-                    <span className="text-sm text-gray-400 ml-1">
-                      ({mountainData.totalRatings})
+                {/* Location */}
+                <div className="flex items-center text-gray-400 group-hover:text-gray-300">
+                  <button
+                    onClick={() => setShowMap(true)}
+                    className="flex items-center hover:text-orange-400 transition-colors cursor-pointer"
+                  >
+                    <svg className="w-5 h-10 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-sm group-hover:text-gray-200 transition-colors duration-300">
+                      {mountainData.ukHillsDbLatitude}, {mountainData.ukHillsDbLongitude}
                     </span>
-                  </>
-                )}
+                  </button>
+                </div>
+
+                {/* Region */}
+                <div className="flex items-center text-gray-400 group-hover:text-gray-300">
+                  <svg className="w-5 h-10 mr-2 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm group-hover:text-gray-200 transition-colors duration-300">
+                    Region {mountainData.ukHillsDbSection}
+                  </span>
+                </div>
               </div>
-              {session?.user && (
-                <div className="flex items-center gap-2">
-                  {recentComments.length > 0 && (
+
+              {/* Rating Stars and Comment Button */}
+              <div className="pt-2 border-t border-gray-700/50 flex items-center justify-between">
+                <div className="flex items-center gap-0.5">
+                  {rating === undefined ? (
+                    <span className="text-sm text-gray-500">Not Rated</span>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <svg
+                            key={star}
+                            className={`w-4 h-4 relative ${star <= Math.floor(rating) ? 'text-orange-400' : 'text-gray-600'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            {/* Show half star if needed */}
+                            {(Math.ceil(rating) === star && !Number.isInteger(rating)) && (
+                              <svg 
+                                className="absolute inset-0 w-4 h-4 text-orange-400"
+                                viewBox="0 0 20 20"
+                                style={{ 
+                                  fill: 'currentColor',
+                                  clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)'
+                                }}
+                              >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            )}
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="text-sm text-gray-400 ml-1">
+                        ({mountainData.totalRatings})
+                      </span>
+                    </>
+                  )}
+                </div>
+                {session?.user && (
+                  <div className="flex items-center gap-2">
+                    {recentComments.length > 0 && (
+                      <button
+                        onClick={() => setShowComments(true)}
+                        className="group/tooltip relative w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-200 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <div className="absolute bottom-full right-0 transform -translate-y-2 pointer-events-none opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200">
+                          <div className="px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap border border-gray-800">
+                            View Comments
+                            <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900 border-r border-b border-gray-800"></div>
+                          </div>
+                        </div>
+                      </button>
+                    )}
                     <button
-                      onClick={() => setShowComments(true)}
-                      className="group/tooltip relative w-8 h-8 flex items-center justify-center rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-200 transition-colors"
+                      ref={buttonRef}
+                      onClick={() => setShowRatingPanel(true)}
+                      className={`group/tooltip relative w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
+                        hasUserRated
+                          ? 'bg-orange-500 text-white hover:bg-orange-600'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-200'
+                      }`}
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                       </svg>
                       <div className="absolute bottom-full right-0 transform -translate-y-2 pointer-events-none opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200">
                         <div className="px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap border border-gray-800">
-                          View Comments
+                          {hasUserRated ? "View your rating" : "Rate & Comment"}
                           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900 border-r border-b border-gray-800"></div>
                         </div>
                       </div>
                     </button>
-                  )}
+                  </div>
+                )}
+                {!session?.user && (
+                  <a href="/login" className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
+                    Sign in
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Completion Confirmation Modal */}
+        {showCompletionModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
+            <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-md mx-4">
+              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                <h3 className="text-lg font-medium text-white">Congratulations</h3>
+                <button
+                  onClick={() => {
+                    setShowCompletionModal(false);
+                    processToggle(true);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4">
+                <p className="text-gray-300 mb-4">
+                  Congratulations on your climb up {mountainData.ukHillsDbName}! Would you like to rate and comment on your experience?
+                </p>
+                <div className="flex justify-end gap-3">
                   <button
-                    ref={buttonRef}
-                    onClick={() => setShowRatingPanel(true)}
-                    className={`group/tooltip relative w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-                      hasUserRated
-                        ? 'bg-orange-500 text-white hover:bg-orange-600'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-gray-200'
-                    }`}
+                    onClick={() => {
+                      setShowCompletionModal(false);
+                      processToggle(true);
+                    }}
+                    className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                    </svg>
-                    <div className="absolute bottom-full right-0 transform -translate-y-2 pointer-events-none opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200">
-                      <div className="px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap border border-gray-800">
-                        {hasUserRated ? "View your rating" : "Rate & Comment"}
-                        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900 border-r border-b border-gray-800"></div>
-                      </div>
-                    </div>
+                    Skip
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCompletionModal(false);
+                      processToggle(true);
+                      setShowRatingPanel(true);
+                    }}
+                    className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                  >
+                    Rate & Comment
                   </button>
                 </div>
-              )}
-              {!session?.user && (
-                <a href="/login" className="text-sm text-orange-400 hover:text-orange-300 transition-colors">
-                  Sign in
-                </a>
-              )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Comments Modal */}
+        {showComments && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-lg mx-4">
+              <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
+                <h3 className="text-lg font-medium text-white">Recent Comments</h3>
+                <button
+                  onClick={() => setShowComments(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
+                {recentComments.map((comment, index) => (
+                  <div key={index} className="text-sm">
+                    <div className="mb-2">
+                      <span className="text-orange-400 font-medium">{comment.userName || 'Anonymous'}</span>
+                      <div className="flex items-center gap-1 mt-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <svg
+                            key={star}
+                            className={`w-4 h-4 ${star <= comment.rating ? 'text-orange-400' : 'text-gray-600'}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-gray-300">{comment.comment}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Completion Confirmation Modal */}
-      {showCompletionModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-md mx-4">
-            <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-white">Congratulations</h3>
-              <button
-                onClick={() => {
-                  setShowCompletionModal(false);
-                  processToggle(true);
-                }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-4">
-              <p className="text-gray-300 mb-4">
-                Congratulations on your climb up {mountainData.ukHillsDbName}! Would you like to rate and comment on your experience?
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setShowCompletionModal(false);
-                    processToggle(true);
-                  }}
-                  className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
-                >
-                  Skip
-                </button>
-                <button
-                  onClick={() => {
-                    setShowCompletionModal(false);
-                    processToggle(true);
-                    setShowRatingPanel(true);
-                  }}
-                  className="px-4 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-                >
-                  Rate & Comment
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Comments Modal */}
-      {showComments && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-gray-800 rounded-xl shadow-xl border border-orange-500/20 w-full max-w-lg mx-4">
-            <div className="p-4 border-b border-gray-700/50 flex items-center justify-between">
-              <h3 className="text-lg font-medium text-white">Recent Comments</h3>
-              <button
-                onClick={() => setShowComments(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
-              {recentComments.map((comment, index) => (
-                <div key={index} className="text-sm">
-                  <div className="mb-2">
-                    <span className="text-orange-400 font-medium">{comment.userName || 'Anonymous'}</span>
-                    <div className="flex items-center gap-1 mt-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <svg
-                          key={star}
-                          className={`w-4 h-4 ${star <= comment.rating ? 'text-orange-400' : 'text-gray-600'}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-gray-300">{comment.comment}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Render map modal through portal */}
+      {renderMapModal()}
+    </>
   );
 }; 
