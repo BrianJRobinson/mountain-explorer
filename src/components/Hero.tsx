@@ -28,11 +28,6 @@ export const Hero = () => {
         </h1>
         <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto">
         Explore the Majestic Mountains of the UK Embark on an unforgettable journey through the UK&apos;s most breathtaking peaks. 
-        Track your progress as you conquer each climb, marking off your achievements along the way. 
-        Celebrate your adventure by sharing your thoughts and rating the climb, inspiring others to take on the challenge
-        </p>
-        <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto">
-        Explore the Majestic Mountains of the UK Embark on an unforgettable journey through the UK&apos;s most breathtaking peaks. 
         </p>
         <p className="text-xl md:text-2xl mb-8 max-w-2xl mx-auto" >
         Track your progress as you conquer each climb and Celebrate your adventure by sharing your thoughts and rating the climb, inspiring others to take on the challenge
