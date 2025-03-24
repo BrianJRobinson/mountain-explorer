@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { StarRating } from '../shared/StarRating';
 
-interface Comment {
+export interface Comment {
   userId: string;
   userName: string | null;
   userAvatar?: string | null;

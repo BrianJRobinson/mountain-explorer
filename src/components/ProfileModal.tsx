@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 import { useUser } from '@/context/UserContext';
 

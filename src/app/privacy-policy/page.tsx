@@ -62,7 +62,7 @@ const PrivacyPolicy: React.FC = () => {
 
             <h2 className="text-2xl font-semibold text-white mt-8 mb-4">5. Cookie Usage</h2>
             <p className="text-gray-300">
-              We use cookies to enhance your experience on Mountain Explorer. Here's how we use them:
+              We use cookies to enhance your experience on Mountain Explorer. Here&apos;s how we use them:
             </p>
             <ul className="list-disc pl-6 text-gray-300 space-y-2">
               <li><strong>Essential Cookies:</strong> Required for the website to function properly, including authentication and session management.</li>

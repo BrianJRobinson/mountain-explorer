@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import type { Map as LeafletMap } from 'leaflet';
-import type { Map as MapLibreMap, MapOptions } from 'maplibre-gl';
+import type { Map as MapLibreMap, MapOptions, Marker } from 'maplibre-gl';
 import { Mountain } from '@/app/types/Mountain';
 
 interface MapContentProps {
@@ -21,7 +21,7 @@ export const MapContent: React.FC<MapContentProps> = ({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
   const maplibreMap = useRef<MapLibreMap | null>(null);
-  const markers3D = useRef<any[]>([]);  // Changed type to any[] since we don't have maplibregl in scope
+  const markers3D = useRef<Marker[]>([]);
   const [isLoadingMarkers, setIsLoadingMarkers] = useState(false);
 
   // Add markers progressively

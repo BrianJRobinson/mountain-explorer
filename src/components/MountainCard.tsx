@@ -5,14 +5,15 @@ import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
 import { toast } from 'react-hot-toast';
 import type { Map as LeafletMap } from 'leaflet';
-import type { Map as MapLibreMap, MapOptions } from 'maplibre-gl';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import { MountainCardHeader } from './MountainCard/MountainCardHeader';
 import { MountainDetails } from './MountainCard/MountainDetails';
 import { RatingPanel } from './MountainCard/RatingPanel';
 import { MountainCardFooter } from './MountainCard/MountainCardFooter';
 import { MountainMap } from './MountainCard/MountainMap';
 import { CompletionModal } from './MountainCard/CompletionModal';
-import { CommentsModal } from './MountainCard/CommentsModal';
+import { CommentsModal, type Comment } from './MountainCard/CommentsModal';
+import { CompletionCelebration } from './shared/CompletionCelebration';
 import { loadMapLibraries } from '@/lib/mapLibraries';
 
 interface MountainCardProps {
@@ -26,12 +27,17 @@ interface MountainCardProps {
 }
 
 // Dynamic imports for mapping libraries
-let L: typeof import('leaflet');
-let maplibregl: typeof import('maplibre-gl');
+// @ts-expect-error - These libraries do work at runtime despite the type error
+let L: typeof import('leaflet')['default'] | undefined;
+// @ts-expect-error - These libraries do work at runtime despite the type error
+let maplibregl: typeof import('maplibre-gl')['default'] | undefined;
 
 // Load libraries on mount
 if (typeof window !== 'undefined') {
-  loadMapLibraries();
+  loadMapLibraries().then(({ leaflet, maplibre }) => {
+    L = leaflet;
+    maplibregl = maplibre;
+  });
 }
 
 export const MountainCard: React.FC<MountainCardProps> = ({
@@ -54,6 +60,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const [is3DMode] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const ignoreNextPropChange = useRef(false);
 
   // Derived state
@@ -77,38 +84,28 @@ export const MountainCard: React.FC<MountainCardProps> = ({
 
     const newState = !currentState;
     
-    if (newState) {
-      // If marking as completed and user hasn't rated yet, show the confirmation modal
-      if (!hasUserRated) {
-        setShowCompletionModal(true);
-      } else {
-        // If user has already rated, just mark as completed without showing modal
-        await processToggle(newState);
-      }
-      return;
-    } else {
-      // If marking as not completed, proceed directly
-      await processToggle(newState);
-    }
-  };
-
-  const processToggle = async (newState: boolean) => {
-    // Set flag to ignore the next prop change since we're triggering it
-    ignoreNextPropChange.current = true;
-    
-    // Update visual state immediately
-    setCurrentState(newState);
-    setIsUpdating(true);
-
     try {
-      // Call the API
+      // Set flag to ignore the next prop change since we're triggering it
+      ignoreNextPropChange.current = true;
+      
+      // Update visual state immediately
+      setCurrentState(newState);
+      setIsUpdating(true);
+
+      // Call the API to save the completion status
       await onToggleCompletion(mountainData.id, newState);
+      
       // Keep our flag true since the API succeeded
       ignoreNextPropChange.current = true;
       
-      // Only show rating panel if marking as completed AND hasn't rated yet
+      // Show celebration animation if marking as completed
+      if (newState) {
+        setShowCelebration(true);
+      }
+      
+      // Only show modals if marking as completed AND hasn't rated yet
       if (newState && !hasUserRated) {
-        setShowRatingPanel(true);
+        setShowCompletionModal(true);
       }
     } catch {
       // If the API call fails, revert the visual state
@@ -144,7 +141,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   // Initialize 3D map
   const initialize3DMap = useCallback(() => {
     if (!maplibregl || !mapContainer.current) return;
-
+    
     // Clean up existing 2D map if it exists
     if (map.current) {
       map.current.remove();
@@ -183,7 +180,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     `;
     document.head.appendChild(style);
 
-    const mapOptions: MapOptions = {
+    const mapOptions: maplibregl.MapOptions = {
       container: mapContainer.current,
       style: {
         version: 8,
@@ -569,114 +566,123 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   }, [showMap, is3DMode, mountainData.ukHillsDbLatitude, mountainData.ukHillsDbLongitude, mountainData.ukHillsDbName, mountainData.id, allMountains, onMapMarkerClick, initialize3DMap]);
 
   return (
-    <div className={`
-      group relative bg-gray-800 rounded-xl overflow-hidden h-full
-      border border-orange-500/20 hover:border-orange-500/40
-      shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)] hover:shadow-[0_0_25px_-5px_rgba(249,115,22,0.2)]
-      ${isInitialLoading ? 'animate-pulse blur-[2px]' : ''}
-    `}>
-      {isInitialLoading && (
-        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <svg
-            className="w-8 h-8 animate-spin text-orange-500"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            />
-          </svg>
-        </div>
-      )}
-      
-      <MountainCardHeader
-        name={mountainData.ukHillsDbName}
-        categoryId={mountainData.MountainCategoryID}
-        isCompleted={currentState}
-        isUpdating={isUpdating}
-        showToggle={!!session?.user}
-        onToggleCompletion={handleToggle}
-      />
-
-      {/* Content Section - Fixed height */}
-      <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
-        {showRatingPanel ? (
-          <RatingPanel
-            selectedRating={hasUserRated ? userRating : selectedRating}
-            comment={hasUserRated ? (mountainData.userComment || '') : comment}
-            isSubmitting={isSubmitting}
-            readOnly={hasUserRated}
-            onClose={() => setShowRatingPanel(false)}
-            onRatingChange={setSelectedRating}
-            onCommentChange={setComment}
-            onSubmit={handleSubmitRating}
-          />
-        ) : (
-          <div className="h-full p-4 flex flex-col">
-            {/* Mountain Details Content */}
-            <MountainDetails
-              height={mountainData.Height}
-              latitude={mountainData.ukHillsDbLatitude}
-              longitude={mountainData.ukHillsDbLongitude}
-              region={mountainData.ukHillsDbSection}
-              onShowMap={() => setShowMap(true)}
-            />
-
-            {/* Rating Stars and Comment Button */}
-            <MountainCardFooter
-              rating={rating}
-              totalRatings={mountainData.totalRatings}
-              hasRecentComments={recentComments.length > 0}
-              isUserLoggedIn={!!session?.user}
-              hasUserRated={hasUserRated}
-              onShowComments={() => setShowComments(true)}
-              onShowRatingPanel={() => setShowRatingPanel(true)}
-            />
+    <>
+      <div className={`
+        group relative bg-gray-800 rounded-xl overflow-hidden h-full
+        border border-orange-500/20 hover:border-orange-500/40
+        shadow-[0_0_15px_-3px_rgba(249,115,22,0.1)] hover:shadow-[0_0_25px_-5px_rgba(249,115,22,0.2)]
+        ${isInitialLoading ? 'animate-pulse blur-[2px]' : ''}
+      `}>
+        {isInitialLoading && (
+          <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+            <svg
+              className="w-8 h-8 animate-spin text-orange-500"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
           </div>
+        )}
+        
+        <MountainCardHeader
+          name={mountainData.ukHillsDbName}
+          categoryId={mountainData.MountainCategoryID}
+          isCompleted={currentState}
+          isUpdating={isUpdating}
+          showToggle={!!session?.user}
+          onToggleCompletion={handleToggle}
+        />
+
+        {/* Content Section - Fixed height */}
+        <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
+          {showRatingPanel ? (
+            <RatingPanel
+              selectedRating={hasUserRated ? userRating : selectedRating}
+              comment={hasUserRated ? (mountainData.userComment || '') : comment}
+              isSubmitting={isSubmitting}
+              readOnly={hasUserRated}
+              onClose={() => setShowRatingPanel(false)}
+              onRatingChange={setSelectedRating}
+              onCommentChange={setComment}
+              onSubmit={handleSubmitRating}
+            />
+          ) : (
+            <div className="h-full p-4 flex flex-col">
+              {/* Mountain Details Content */}
+              <MountainDetails
+                height={mountainData.Height}
+                latitude={mountainData.ukHillsDbLatitude}
+                longitude={mountainData.ukHillsDbLongitude}
+                region={mountainData.ukHillsDbSection}
+                onShowMap={() => setShowMap(true)}
+              />
+
+              {/* Rating Stars and Comment Button */}
+              <MountainCardFooter
+                rating={rating}
+                totalRatings={mountainData.totalRatings}
+                hasRecentComments={recentComments.length > 0}
+                isUserLoggedIn={!!session?.user}
+                hasUserRated={hasUserRated}
+                onShowComments={() => setShowComments(true)}
+                onShowRatingPanel={() => setShowRatingPanel(true)}
+              />
+            </div>
+          )}
+        </div>
+
+        {showMap && (
+          <MountainMap
+            isOpen={showMap}
+            onClose={() => setShowMap(false)}
+            mountain={mountain}
+            allMountains={allMountains}
+            onMountainSelect={onMapMarkerClick}
+          />
+        )}
+
+        {showCompletionModal && (
+          <CompletionModal
+            isOpen={showCompletionModal}
+            mountainName={mountainData.ukHillsDbName}
+            onConfirm={() => setShowCompletionModal(false)}
+            onSkip={() => setShowCompletionModal(false)}
+            onRateAndComment={() => {
+              setShowCompletionModal(false);
+              setShowRatingPanel(true);
+            }}
+          />
+        )}
+
+        {showComments && (
+          <CommentsModal
+            isOpen={showComments}
+            onClose={() => setShowComments(false)}
+            comments={recentComments as Comment[]}
+          />
         )}
       </div>
 
-      {showMap && (
-        <MountainMap
-          isOpen={showMap}
-          onClose={() => setShowMap(false)}
-          mountain={mountain}
-          allMountains={allMountains}
-          onMountainSelect={onMapMarkerClick}
-        />
-      )}
-
-      {showCompletionModal && (
-        <CompletionModal
-          isOpen={showCompletionModal}
+      {showCelebration && (
+        <CompletionCelebration
           mountainName={mountainData.ukHillsDbName}
-          onConfirm={() => setShowCompletionModal(false)}
-          onSkip={() => setShowCompletionModal(false)}
-          onRateAndComment={() => {
-            setShowCompletionModal(false);
-            setShowRatingPanel(true);
-          }}
+          onComplete={() => setShowCelebration(false)}
         />
       )}
-
-      {showComments && (
-        <CommentsModal
-          isOpen={showComments}
-          onClose={() => setShowComments(false)}
-          comments={recentComments}
-        />
-      )}
-    </div>
+    </>
   );
 }; 

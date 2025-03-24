@@ -15,6 +15,12 @@ declare module 'next-auth' {
       avatar?: string | null;
     }
   }
+  interface User {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+    avatar?: string | null;
+  }
 }
 
 if (!process.env.NEXTAUTH_SECRET) {

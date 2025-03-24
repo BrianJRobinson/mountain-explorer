@@ -4,6 +4,11 @@ import { authOptions } from '@/app/api/auth/auth-options';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
+interface UpdateUserData {
+  name: string;
+  avatar?: string;
+}
+
 export async function PUT(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,7 +23,7 @@ export async function PUT(request: Request) {
       return new NextResponse('Invalid username', { status: 400 });
     }
 
-    const updateData: any = { name };
+    const updateData: UpdateUserData = { name };
     
     if (avatar) {
       updateData.avatar = avatar;

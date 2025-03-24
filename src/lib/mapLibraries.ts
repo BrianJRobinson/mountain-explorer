@@ -1,13 +1,19 @@
 let librariesLoaded = false;
 
 export const loadMapLibraries = async () => {
-  if (librariesLoaded || typeof window === 'undefined') return;
+  if (librariesLoaded || typeof window === 'undefined') {
+    return {
+      leaflet: undefined,
+      maplibre: undefined
+    };
+  }
 
   try {
-    // Load Leaflet
-    await import('leaflet');
-    // Load MapLibre GL
-    await import('maplibre-gl');
+    // Load libraries
+    const [leaflet, maplibre] = await Promise.all([
+      import('leaflet'),
+      import('maplibre-gl')
+    ]);
     
     // Add Leaflet CSS
     const leafletCSS = document.createElement('link');
@@ -34,8 +40,16 @@ export const loadMapLibraries = async () => {
     document.head.appendChild(script);
 
     librariesLoaded = true;
+    return {
+      leaflet: leaflet.default,
+      maplibre: maplibre.default
+    };
   } catch (error) {
     console.error('Error loading map libraries:', error);
+    return {
+      leaflet: undefined,
+      maplibre: undefined
+    };
   }
 };
 

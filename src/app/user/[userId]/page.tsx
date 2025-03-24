@@ -5,12 +5,7 @@ import { UserProfile } from '@/components/UserProfile';
 import { notFound } from 'next/navigation';
 import { promises as fs } from 'fs';
 import path from 'path';
-
-interface UserProfilePageProps {
-  params: {
-    userId: string;
-  };
-}
+import type { Metadata } from 'next';
 
 interface MountainDetails {
   id: number;
@@ -28,13 +23,44 @@ interface CommentWithMountain {
   mountain: MountainDetails;
 }
 
-export default async function UserProfilePage({ params }: UserProfilePageProps) {
+interface PageProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params?: Promise<any>;
+}
+
+export async function generateMetadata({ 
+  params 
+}: PageProps): Promise<Metadata> {
+  if (!params) {
+    return {
+      title: 'User Profile'
+    };
+  }
+  const resolvedParams = await params;
+  return {
+    title: `User Profile - ${resolvedParams.userId}`,
+  };
+}
+
+export default async function Page({ 
+  params 
+}: PageProps) {
+  if (!params) {
+    notFound();
+  }
+  const resolvedParams = await params;
+  const userId = resolvedParams.userId;
+
+  if (!userId) {
+    notFound();
+  }
+
   const session = await getServerSession(authOptions);
   
   // Fetch user details
   const user = await prisma.user.findUnique({
     where: {
-      id: params.userId,
+      id: userId,
     },
     select: {
       id: true,
@@ -50,7 +76,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
   // Fetch all mountain ratings and comments by this user
   const userComments = await prisma.mountainRating.findMany({
     where: {
-      userId: params.userId,
+      userId: userId,
       comment: {
         not: null,
       },
