@@ -95,30 +95,31 @@ export const MapContent: React.FC<MapContentProps> = ({
               const marker = L.marker([mLat, mLng])
                 .addTo(map.current)
                 .bindPopup(
-                  `<div class="text-center">
-                    <strong>${m.ukHillsDbName}</strong><br/>
-                    ${m.Height}m - ${m.MountainCategoryID === 12 ? 'Munro' : 'Corbett'}<br/>
-                    <button 
-                      onclick="window.dispatchEvent(new CustomEvent('mountain-selected', { detail: '${m.ukHillsDbName}' }))"
-                      class="px-2 py-1 mt-2 bg-orange-500 text-white rounded-md text-sm cursor-pointer hover:bg-orange-600"
-                    >
-                      Show Details
-                    </button>
-                  </div>`,
+                  () => {
+                    const container = document.createElement('div');
+                    container.className = 'text-center';
+                    container.innerHTML = `
+                      <strong>${m.ukHillsDbName}</strong><br/>
+                      ${m.Height}m - ${m.MountainCategoryID === 12 ? 'Munro' : 'Corbett'}<br/>
+                    `;
+
+                    const button = document.createElement('button');
+                    button.className = 'px-2 py-1 mt-2 bg-orange-500 text-white rounded-md text-sm cursor-pointer hover:bg-orange-600';
+                    button.textContent = 'Highlight This';
+                    button.onclick = () => {
+                      if (onMountainSelect) {
+                        onMountainSelect(m.ukHillsDbName);
+                        onClose();
+                      }
+                    };
+
+                    container.appendChild(button);
+                    return container;
+                  },
                   {
                     className: 'mountain-popup'
                   }
                 );
-
-              // Add event listener for mountain selection
-              const handleMountainSelected = (event: CustomEvent<string>) => {
-                if (onMountainSelect) {
-                  onMountainSelect(event.detail);
-                  onClose();
-                }
-              };
-
-              window.addEventListener('mountain-selected', handleMountainSelected as EventListener);
 
               if (m.id === mountain.id) {
                 marker.setZIndexOffset(1000);
@@ -459,14 +460,6 @@ export const MapContent: React.FC<MapContentProps> = ({
       if (style) {
         style.remove();
       }
-      // Clean up event listeners
-      const handleMountainSelected = (event: CustomEvent<string>) => {
-        if (onMountainSelect) {
-          onMountainSelect(event.detail);
-          onClose();
-        }
-      };
-      window.removeEventListener('mountain-selected', handleMountainSelected as EventListener);
     };
   }, [is3DMode, initialize3DMap, initialize2DMap]);
 
