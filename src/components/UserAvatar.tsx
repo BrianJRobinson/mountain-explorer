@@ -21,7 +21,7 @@ export function UserAvatar() {
         <div className="w-full h-full bg-gray-700 animate-pulse" />
       ) : (
         <Image
-          src={`/avatars/${userAvatar === "default" ? 'Avatar1.webp' : userAvatar} `}
+          src={`/avatars/${userAvatar === "default" ? 'Avatar1.webp' : userAvatar}`}
           alt={`${userName}'s avatar`}
           fill
           sizes="(max-width: 768px) 40px, 40px"

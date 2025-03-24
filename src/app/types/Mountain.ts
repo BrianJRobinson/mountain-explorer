@@ -16,5 +16,6 @@ export interface Mountain {
     comment: string | null;
     createdAt: string;
     userName: string | null;
+    userAvatar?: string | null;
   }>;
 } 

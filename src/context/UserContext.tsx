@@ -28,9 +28,22 @@ export function UserProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    console.log('Session status:', status);
+    console.log('Session data:', session);
+    console.log('User data:', session?.user);
+    console.log('Avatar from session:', session?.user?.avatar);
+
     if (session?.user) {
       setUserName(session.user.name || '');
-      setUserAvatar(session.user.avatar || 'Avatar1.webp');
+      if (session.user.avatar) {
+        console.log('Setting avatar to:', session.user.avatar);
+        setUserAvatar(session.user.avatar);
+      } else {
+        console.log('No avatar in session, using default');
+        setUserAvatar('default');
+      }
+    } else {
+      setUserAvatar('default');
     }
     
     setIsLoading(false);

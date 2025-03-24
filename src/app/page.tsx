@@ -101,7 +101,9 @@ async function getData() {
         createdAt: true,
         user: {
           select: {
-            name: true
+            id: true,
+            name: true,
+            avatar: true
           }
         }
       },
@@ -121,7 +123,9 @@ async function getData() {
           rating: comment.rating,
           comment: comment.comment || null,
           createdAt: comment.createdAt.toISOString(),
-          userName: comment.user.name || null
+          userName: comment.user.name || null,
+          userAvatar: comment.user.avatar || null,
+          userId: comment.user.id
         });
       }
     });

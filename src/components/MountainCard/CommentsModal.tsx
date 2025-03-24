@@ -1,8 +1,12 @@
 import React from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { StarRating } from '../shared/StarRating';
 
 interface Comment {
+  userId: string;
   userName: string | null;
+  userAvatar?: string | null;
   rating: number;
   comment: string | null;
   createdAt: string;
@@ -37,17 +41,37 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
         </div>
         <div className="p-4 max-h-[60vh] overflow-y-auto space-y-4">
           {comments.map((comment, index) => (
-            <div key={index} className="text-sm">
-              <div className="mb-2">
-                <span className="text-orange-400 font-medium">{comment.userName || 'Anonymous'}</span>
-                <div className="flex items-center gap-1 mt-1">
-                  <StarRating
-                    rating={comment.rating}
-                    size="sm"
-                  />
-                </div>
+            <div key={index} className="text-sm flex gap-3">
+              <div className="flex-shrink-0">
+                <Link href={`/user/${comment.userId}`} className="block">
+                  <div className="w-8 h-8 rounded-full overflow-hidden relative hover:ring-2 hover:ring-orange-500 transition-all">
+                    <Image
+                      src={`/avatars/${comment.userAvatar === "default" ? 'Avatar1.webp' : comment.userAvatar || 'Avatar1.webp'}`}
+                      alt={`${comment.userName || 'Anonymous'}'s avatar`}
+                      fill
+                      sizes="32px"
+                      className="object-cover"
+                    />
+                  </div>
+                </Link>
               </div>
-              <p className="text-gray-300">{comment.comment}</p>
+              <div className="flex-1">
+                <div className="mb-2">
+                  <Link 
+                    href={`/user/${comment.userId}`}
+                    className="text-orange-400 font-medium hover:text-orange-300 transition-colors"
+                  >
+                    {comment.userName || 'Anonymous'}
+                  </Link>
+                  <div className="flex items-center gap-1 mt-1">
+                    <StarRating
+                      rating={comment.rating}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+                <p className="text-gray-300">{comment.comment}</p>
+              </div>
             </div>
           ))}
         </div>
