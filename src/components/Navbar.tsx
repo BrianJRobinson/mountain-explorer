@@ -59,7 +59,7 @@ export const Navbar = () => {
                   </Link>
                   <Link
                     href="/register"
-                    className="bg-orange-500 text-white shadow-lg transition-colors px-3 py-1.5 rounded-lg text-sm sm:w-full sm:text-base"
+                    className="bg-orange-500 text-white shadow-lg transition-colors px-3 py-1.5 rounded-lg text-sm sm:text-base"
                   >
                     Register
                   </Link>

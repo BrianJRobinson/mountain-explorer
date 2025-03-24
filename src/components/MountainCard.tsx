@@ -13,6 +13,7 @@ import { MountainCardFooter } from './MountainCard/MountainCardFooter';
 import { MountainMap } from './MountainCard/MountainMap';
 import { CompletionModal } from './MountainCard/CompletionModal';
 import { CommentsModal } from './MountainCard/CommentsModal';
+import { loadMapLibraries } from '@/lib/mapLibraries';
 
 interface MountainCardProps {
   mountain: Mountain;
@@ -27,45 +28,6 @@ interface MountainCardProps {
 // Dynamic imports for mapping libraries
 let L: typeof import('leaflet');
 let maplibregl: typeof import('maplibre-gl');
-
-const loadMapLibraries = async () => {
-  if (typeof window === 'undefined') return;
-
-  try {
-    // Import the libraries
-    const [leafletModule, maplibreModule] = await Promise.all([
-      import('leaflet'),
-      import('maplibre-gl')
-    ]);
-
-    L = leafletModule.default;
-    maplibregl = maplibreModule.default;
-
-    // Add CSS to head
-    const leafletCss = document.createElement('link');
-    leafletCss.rel = 'stylesheet';
-    leafletCss.href = 'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css';
-    document.head.appendChild(leafletCss);
-
-    const maplibreCss = document.createElement('link');
-    maplibreCss.rel = 'stylesheet';
-    maplibreCss.href = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css';
-    document.head.appendChild(maplibreCss);
-
-    // Fix Leaflet icon paths
-    if (L) {
-      // @ts-expect-error Icon properties are not fully typed in Leaflet types
-      delete L.Icon.Default.prototype._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-      });
-    }
-  } catch (error) {
-    console.error('Error loading map libraries:', error);
-  }
-};
 
 // Load libraries on mount
 if (typeof window !== 'undefined') {
