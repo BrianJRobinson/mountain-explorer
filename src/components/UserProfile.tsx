@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { StarRating } from './shared/StarRating';
 import { formatDistanceToNow } from 'date-fns';
+import { useSession } from 'next-auth/react';
 
 interface UserProfileProps {
   user: {
@@ -28,6 +29,57 @@ interface UserProfileProps {
 }
 
 export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) {
+  const { data: session } = useSession();
+  const [followStats, setFollowStats] = useState({
+    followingCount: 0,
+    followersCount: 0,
+    isFollowing: false,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchFollowStats = async () => {
+      try {
+        const response = await fetch(`/api/follow?userId=${user.id}`);
+        const data = await response.json();
+        setFollowStats(data);
+      } catch (error) {
+        console.error('Error fetching follow stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (session?.user) {
+      fetchFollowStats();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user.id, session?.user]);
+
+  const handleFollowToggle = async () => {
+    if (!session?.user) return;
+
+    try {
+      const response = await fetch('/api/follow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetUserId: user.id }),
+      });
+
+      const data = await response.json();
+      setFollowStats(prev => ({
+        ...prev,
+        isFollowing: data.following,
+        followersCount: data.following ? prev.followersCount + 1 : prev.followersCount - 1,
+      }));
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 pt-20">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -45,17 +97,37 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white mb-2 hover:text-orange-400 transition-colors">{user.name || 'Anonymous User'}</h1>
-              <p className="text-gray-400">
-                {comments.length} mountain {comments.length === 1 ? 'review' : 'reviews'}
-              </p>
+              <div className="flex items-center gap-4 text-gray-400">
+                <p>{comments.length} mountain {comments.length === 1 ? 'review' : 'reviews'}</p>
+                {!isLoading && (
+                  <>
+                    <p>{followStats.followersCount} followers</p>
+                    <p>{followStats.followingCount} following</p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-          <Link 
-            href="/"
-            className="text-orange-500 hover:text-orange-400 transition-colors"
-          >
-            Back to Home ↩
-          </Link>
+          <div className="flex items-center gap-4">
+            {!isOwnProfile && session?.user && (
+              <button
+                onClick={handleFollowToggle}
+                className={`px-4 py-2 rounded-lg transition-colors duration-300 ${
+                  followStats.isFollowing
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                    : 'bg-gray-700 hover:bg-gray-600 text-white'
+                }`}
+              >
+                {followStats.isFollowing ? 'Following' : 'Follow'}
+              </button>
+            )}
+            <Link 
+              href="/"
+              className="text-orange-500 hover:text-orange-400 transition-colors"
+            >
+              Back to Home ↩
+            </Link>
+          </div>
         </div>
 
         {/* Comments Grid */}
