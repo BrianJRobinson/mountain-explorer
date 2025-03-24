@@ -90,6 +90,7 @@ export function ProfileModal({ isOpen, onClose, currentUsername, currentAvatar }
                     src={`/avatars/${avatar}`}
                     alt={`Avatar ${avatar}`}
                     fill
+                    sizes="(max-width: 768px) 80px, 100px"
                     className="rounded-lg object-cover"
                   />
                 </div>

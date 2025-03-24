@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
 import { ReCaptchaScript } from '@/components/ReCaptchaScript'
 import { Footer } from '@/components/Footer'
+import { CookieBanner } from '@/components/CookieBanner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -31,6 +32,7 @@ export default function RootLayout({
             {children}
           </div>
           <Footer />
+          <CookieBanner />
         </Providers>
         <ReCaptchaScript />
         <Toaster 

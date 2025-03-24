@@ -60,19 +60,39 @@ const PrivacyPolicy: React.FC = () => {
               parties, except as required by law or with your explicit consent.
             </p>
 
-            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">5. Your Rights</h2>
+            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">5. Cookie Usage</h2>
+            <p className="text-gray-300">
+              We use cookies to enhance your experience on Mountain Explorer. Here's how we use them:
+            </p>
+            <ul className="list-disc pl-6 text-gray-300 space-y-2">
+              <li><strong>Essential Cookies:</strong> Required for the website to function properly, including authentication and session management.</li>
+              <li><strong>Authentication Cookies:</strong> Used to keep you logged in and maintain your session.</li>
+              <li><strong>Preference Cookies:</strong> Remember your settings and preferences, such as your cookie acceptance status.</li>
+            </ul>
+            <p className="text-gray-300 mt-4">
+              We also use third-party services that may set cookies:
+            </p>
+            <ul className="list-disc pl-6 text-gray-300 space-y-2">
+              <li><strong>reCAPTCHA:</strong> Used to protect our forms from spam and abuse.</li>
+              <li><strong>NextAuth.js:</strong> Used for secure authentication and session management.</li>
+            </ul>
+            <p className="text-gray-300 mt-4">
+              You can control and manage cookies through your browser settings. Note that disabling certain cookies may affect the functionality of our website.
+            </p>
+
+            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">6. Your Rights</h2>
             <p className="text-gray-300">
               You have the right to access, update, or delete the personal information
               we have about you. To do so, please contact us using the email address below.
             </p>
 
-            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">6. Changes to This Privacy Policy</h2>
+            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">7. Changes to This Privacy Policy</h2>
             <p className="text-gray-300">
               We may update this Privacy Policy from time to time. Any changes will be
               posted on this page with an updated &quot;Last updated&quot; date.
             </p>
 
-            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">7. Contact Us</h2>
+            <h2 className="text-2xl font-semibold text-white mt-8 mb-4">8. Contact Us</h2>
             <p className="text-gray-300">
               If you have any questions or concerns about this Privacy Policy, please
               contact us at:

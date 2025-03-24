@@ -29,6 +29,7 @@ export const Hero = () => {
                 src={`/avatars/${userAvatar === "default" ? 'Avatar1.webp' : userAvatar} `}
                   alt={`${userName}'s avatar`}
                   fill
+                  sizes="(max-width: 768px) 64px, 80px"
                   className="object-cover"
                 />
               )}

@@ -24,6 +24,7 @@ export function UserAvatar() {
           src={`/avatars/${userAvatar === "default" ? 'Avatar1.webp' : userAvatar} `}
           alt={`${userName}'s avatar`}
           fill
+          sizes="(max-width: 768px) 40px, 40px"
           className="object-cover"
         />
       )}
