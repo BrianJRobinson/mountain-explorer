@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { UserAvatar } from './UserAvatar';
+import { NotificationBell } from './shared/NotificationBell';
 
 export const Navbar = () => {
   const { data: session } = useSession();
@@ -38,9 +39,11 @@ export const Navbar = () => {
                 Mountain Explorer
               </Link>
             </div>
-            <div className="w-1/2 flex justify-end items-center gap-4">
+            
+            <div className="flex items-center gap-4">
               {session?.user ? (
                 <>
+                  <NotificationBell />
                   <UserAvatar />
                   <button
                     onClick={() => signOut()}
@@ -67,7 +70,6 @@ export const Navbar = () => {
               )}
             </div>
           </div>
-          
         </div>
       </div>
     </nav>

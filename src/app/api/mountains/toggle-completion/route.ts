@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/auth-options';
+import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { createMountainCompletionNotifications } from '@/lib/notifications';
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,9 @@ export async function POST(request: Request) {
         },
       });
       logger.info('Mountain completion created', result, userId, 'mountain:completed');
+
+      // Create notifications for followers
+      await createMountainCompletionNotifications(userId, mountainId);
     } else {
       result = await prisma.mountainCompletion.delete({
         where: {

@@ -24,6 +24,8 @@ model User {
   mountainRatings          MountainRating[]
   following                Follow[]             @relation("Following")
   followers                Follow[]             @relation("Followers")
+  sentNotifications        Notification[]        @relation("NotificationSender")
+  receivedNotifications    Notification[]        @relation("NotificationRecipient")
 }
 
 model MountainCompletion {
@@ -60,4 +62,20 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  type        String   // e.g., 'MOUNTAIN_COMPLETED', 'FOLLOWED', etc.
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  senderId    String
+  recipientId String
+  mountainId  Int?     // Optional, only for mountain-related notifications
+  sender      User     @relation("NotificationSender", fields: [senderId], references: [id])
+  recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id])
+
+  @@index([recipientId])
+  @@index([senderId])
+  @@index([createdAt])
 }
