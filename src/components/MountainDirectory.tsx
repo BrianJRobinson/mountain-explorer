@@ -25,6 +25,18 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const [columnCount, setColumnCount] = useState(5); // Default to 5 columns
   const parentRef = useRef<HTMLDivElement>(null);
 
+  // Initialize search from URL parameter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const searchParam = params.get('search');
+      if (searchParam) {
+        setSearchQuery(searchParam);
+        setDebouncedSearch(searchParam);
+      }
+    }
+  }, []);
+
   // Card dimensions
   const IMAGE_HEIGHT = 152; // h-38
   const CONTENT_HEIGHT = 240; // Content section height

@@ -170,7 +170,7 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
               {/* Mountain Name Header */}
               <div className="bg-gray-700/50 p-4 border-b border-gray-700/50 transition-colors duration-300 group-hover:bg-gray-700/70">
                 <Link 
-                  href={`/mountain/${comment.mountain.id}`}
+                  href={`/?search=${encodeURIComponent(comment.mountain.ukHillsDbName)}#mountains`}
                   className="text-xl font-semibold text-orange-400 hover:text-orange-300 transition-all duration-300 line-clamp-1 group-hover:scale-105 inline-block"
                 >
                   {comment.mountain.ukHillsDbName}
