@@ -37,6 +37,7 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
     isFollowing: false,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isUpdatingFollowing, setIsUpdatingFollowing] = useState(false);
 
   useEffect(() => {
     const fetchFollowStats = async () => {
@@ -61,7 +62,16 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
   const handleFollowToggle = async () => {
     if (!session?.user) return;
 
+    setIsUpdatingFollowing(true);
+    // Update optimistically
+    setFollowStats(prev => ({
+      ...prev,
+      isFollowing: !prev.isFollowing,
+      followersCount: !prev.isFollowing ? prev.followersCount + 1 : prev.followersCount - 1,
+    }));
+
     try {
+
       const response = await fetch('/api/follow', {
         method: 'POST',
         headers: {
@@ -70,14 +80,24 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
         body: JSON.stringify({ targetUserId: user.id }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        // Revert on error
+        setFollowStats(prev => ({
+          ...prev,
+          isFollowing: !prev.isFollowing,
+          followersCount: prev.isFollowing ? prev.followersCount + 1 : prev.followersCount - 1,
+        }));
+      }
+    } catch (error) {
+      // Revert on error
       setFollowStats(prev => ({
         ...prev,
-        isFollowing: data.following,
-        followersCount: data.following ? prev.followersCount + 1 : prev.followersCount - 1,
+        isFollowing: !prev.isFollowing,
+        followersCount: prev.isFollowing ? prev.followersCount + 1 : prev.followersCount - 1,
       }));
-    } catch (error) {
       console.error('Error toggling follow:', error);
+    } finally {
+      setIsUpdatingFollowing(false);
     }
   };
 
@@ -104,7 +124,7 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
                     <ToggleButton
                       isToggled={followStats.isFollowing}
                       onToggle={handleFollowToggle}
-                      isLoading={isLoading}
+                      isLoading={isUpdatingFollowing}
                       label={followStats.isFollowing ? 'Unfollow user' : 'Follow user'}
                       size="sm"
                     />
@@ -126,7 +146,7 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
                         <ToggleButton
                           isToggled={followStats.isFollowing}
                           onToggle={handleFollowToggle}
-                          isLoading={isLoading}
+                          isLoading={isUpdatingFollowing}
                           label={followStats.isFollowing ? 'Unfollow user' : 'Follow user'}
                           size="sm"
                         />
