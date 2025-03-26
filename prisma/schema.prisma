@@ -22,6 +22,8 @@ model User {
   verificationTokenExpires DateTime?
   mountainProgress         MountainCompletion[]
   mountainRatings          MountainRating[]
+  walkProgress            WalkCompletion[]
+  walkRatings             WalkRating[]
   following                Follow[]             @relation("Following")
   followers                Follow[]             @relation("Followers")
   sentNotifications        Notification[]        @relation("NotificationSender")
@@ -49,6 +51,29 @@ model MountainRating {
   user       User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, mountainId])
+}
+
+model WalkCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  walkName    String
+  completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, walkName])
+}
+
+model WalkRating {
+  id         String   @id @default(cuid())
+  userId     String
+  walkName   String
+  rating     Float
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, walkName])
 }
 
 model Follow {

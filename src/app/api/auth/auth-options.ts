@@ -105,6 +105,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.avatar = user.avatar;
+        token.picture = user.avatar ? `/avatars/${user.avatar}` : '/avatars/Avatar1.webp';
       }
       return token;
     },
@@ -112,6 +113,7 @@ export const authOptions: NextAuthOptions = {
       if (token && session.user) {
         session.user.id = token.id as string;
         session.user.avatar = token.avatar as string;
+        session.user.image = token.picture as string;
       }
       return session;
     }

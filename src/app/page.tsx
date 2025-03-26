@@ -1,158 +1,82 @@
 import { Navbar } from '@/components/Navbar';
-import { Hero } from '@/components/Hero';
-import { MountainDirectory } from '@/components/MountainDirectory';
-import { promises as fs } from 'fs';
-import path from 'path';
-import prisma from '@/lib/prisma';
+import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './api/auth/auth-options';
-import { Mountain } from '@/app/types/Mountain';
+import Image from 'next/image';
 
-interface RawMountain {
-  id: number;
-  ukHillsDbName: string;
-  Height: number;
-  ukHillsDbLatitude: string;
-  ukHillsDbLongitude: string;
-  ukHillsDbSection: string;
-  MountainCategoryID: number;
-  urlName: string;
-}
-
-async function getData() {
+export default async function HomePage() {
   const session = await getServerSession(authOptions);
-  const dataDirectory = path.join(process.cwd(), 'public/data');
-  const fileContents = await fs.readFile(dataDirectory + '/data.json', 'utf8');
-  const data = JSON.parse(fileContents);
-  const mountains: RawMountain[] = data.pageProps.mountains;
-
-  // Fetch ratings for all mountains
-  const allRatings = await prisma.mountainRating.findMany({
-    select: {
-      mountainId: true,
-      rating: true
-    }
-  });
-
-  // Create a map of mountain IDs to their ratings
-  const ratingMap = new Map();
-  allRatings.forEach(rating => {
-    if (!ratingMap.has(rating.mountainId)) {
-      ratingMap.set(rating.mountainId, {
-        sum: 0,
-        count: 0,
-      });
-    }
-    const current = ratingMap.get(rating.mountainId);
-    current.sum += Number(rating.rating);
-    current.count += 1;
-  });
-
-  // Convert sums to averages
-  const ratingAverages = new Map(
-    Array.from(ratingMap.entries()).map(([mountainId, data]) => [
-      mountainId,
-      {
-        averageRating: data.sum / data.count,
-        totalRatings: data.count,
-      }
-    ])
-  );
-
-  // If user is logged in, fetch their ratings and recent comments
-  let userRatings = new Map();
-  const recentComments = new Map();
-  
-
-  if (session?.user?.id) {
-    // Fetch user's ratings
-    const userRatingsData = await prisma.mountainRating.findMany({
-      where: {
-        userId: session.user.id,
-      },
-      select: {
-        mountainId: true,
-        rating: true,
-        comment: true,
-      },
-    });
-
-    userRatings = new Map(
-      userRatingsData.map(rating => [
-        rating.mountainId,
-        {
-          rating: rating.rating,
-          comment: rating.comment,
-        },
-      ])
-    );
-
-    // Fetch recent comments for all mountains
-    const recentCommentsData = await prisma.mountainRating.findMany({
-      where: {
-        comment: {
-          not: null,
-        },
-      },
-      select: {
-        mountainId: true,
-        rating: true,
-        comment: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    // Group comments by mountainId and take the 5 most recent
-    recentCommentsData.forEach(comment => {
-      if (!recentComments.has(comment.mountainId)) {
-        recentComments.set(comment.mountainId, []);
-      }
-      const comments = recentComments.get(comment.mountainId);
-      if (comments.length < 5) {
-        comments.push({
-          rating: comment.rating,
-          comment: comment.comment || null,
-          createdAt: comment.createdAt.toISOString(),
-          userName: comment.user.name || null,
-          userAvatar: comment.user.avatar || null,
-          userId: comment.user.id
-        });
-      }
-    });
-  }
-
-  // Add rating data to each mountain
-  return mountains.map((mountain: RawMountain): Mountain => ({
-    ...mountain,
-    ...ratingAverages.get(mountain.id),
-    ...(session?.user?.id && {
-      userRating: userRatings.get(mountain.id)?.rating,
-      userComment: userRatings.get(mountain.id)?.comment || null,
-      recentComments: recentComments.get(mountain.id) || [],
-    }),
-  }));
-}
-
-export default async function Home() {
-  const mountains = await getData();
 
   return (
-    <div className="min-h-screen bg-gray-900 overflow-x-hidden">
+    <div className="min-h-screen bg-gray-900">
       <Navbar />
-      <Hero />
-      <main className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <MountainDirectory mountains={mountains} />
-      </main>
+      
+      {/* Hero Section */}
+      <section 
+        className="relative min-h-screen flex items-center justify-center"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("/mountain-hero.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        <div className="text-center text-white z-10 px-4 max-w-4xl mx-auto">
+          {session?.user?.image && (
+            <>
+              <div className="flex justify-center mb-4">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-orange-500 shadow-lg">
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name || 'User avatar'}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                  />
+                </div>
+              </div>
+              <h2 className="text-2xl font-semibold mb-8">
+                Welcome, {session.user.name}
+              </h2>
+            </>
+          )}
+          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6">
+            Explore Scotland's Natural Beauty
+          </h1>
+          <p className="text-lg leading-8 text-gray-300 mb-16">
+            Choose your adventure - discover Scotland's majestic mountains or explore scenic walking routes.
+          </p>
+
+          {/* Dataset Selection Cards */}
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 max-w-5xl mx-auto">
+            {/* Mountains Card */}
+            <Link href="/mountains" 
+                  className="relative group rounded-lg border border-gray-700 bg-gray-800/50 p-6 transition-all hover:bg-gray-800 hover:border-gray-600">
+              <div className="flex flex-col items-center text-center">
+                <svg className="h-12 w-12 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-white mb-2">Mountains</h2>
+                <p className="text-gray-400">
+                  Discover and track your progress climbing Scotland's magnificent mountains.
+                </p>
+              </div>
+            </Link>
+
+            {/* Walks Card */}
+            <Link href="/walks" 
+                  className="relative group rounded-lg border border-gray-700 bg-gray-800/50 p-6 transition-all hover:bg-gray-800 hover:border-gray-600">
+              <div className="flex flex-col items-center text-center">
+                <svg className="h-12 w-12 text-green-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <h2 className="text-2xl font-semibold text-white mb-2">Walks</h2>
+                <p className="text-gray-400">
+                  Explore scenic walking routes throughout Scotland's beautiful landscapes.
+                </p>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
-}
+} 
