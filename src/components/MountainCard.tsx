@@ -50,7 +50,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   onSubmitRating,
 }) => {
   const { data: session } = useSession();
-  const [currentState, setCurrentState] = useState(initialIsCompleted);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showRatingPanel, setShowRatingPanel] = useState(false);
   const [selectedRating, setSelectedRating] = useState<number>();
@@ -61,10 +60,8 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
-  const ignoreNextPropChange = useRef(false);
 
   // Derived state
-  //const rating = mountain.averageRating;
   const hasUserRated = !!mountain.userRating;
   const userRating = mountain.userRating;
   const recentComments = mountain.recentComments || [];
@@ -72,14 +69,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const map = useRef<LeafletMap | null>(null);
   const maplibreMap = useRef<MapLibreMap | null>(null);
   const markers3D = useRef<maplibregl.Marker[]>([]);
-
-  // Update currentState when initialIsCompleted changes
-  useEffect(() => {
-    if (!ignoreNextPropChange.current) {
-      setCurrentState(initialIsCompleted);
-    }
-    ignoreNextPropChange.current = false;
-  }, [initialIsCompleted]);
 
   // Initialize 3D map
   const initialize3DMap = useCallback(() => {
@@ -508,68 +497,17 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     };
   }, [showMap, is3DMode, mountain.ukHillsDbLatitude, mountain.ukHillsDbLongitude, mountain.ukHillsDbName, mountain.id, allMountains, onMapMarkerClick, initialize3DMap]);
 
-  const handleToggle = async () => {
-    if (!session?.user || isUpdating) return;
-
-    const newState = !currentState;
-    
-    try {
-      // Set flag to ignore the next prop change since we're triggering it
-      ignoreNextPropChange.current = true;
-      
-      // Update visual state immediately
-      setCurrentState(newState);
-      setIsUpdating(true);
-
-      // Call the API to save the completion status
-      await onToggleCompletion(mountain.id, newState);
-      
-      // Keep our flag true since the API succeeded
-      ignoreNextPropChange.current = true;
-      
-      // Show celebration animation if marking as completed
-      if (newState) {
-        setShowCelebration(true);
-        
-        // Show completion modal if hasn't rated yet
-        if (!hasUserRated) {
-          setShowCompletionModal(true);
-        }
-      }
-    } catch {
-      // If the API call fails, revert the visual state
-      setCurrentState(!newState);
-      // Reset our flag since we want to sync with the server state
-      ignoreNextPropChange.current = false;
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
   const handleSubmitRating = async () => {
     if (!selectedRating) return;
 
     try {
       setIsSubmitting(true);
-      console.log('Submitting rating with values:', {
-        mountainId: mountain.id,
-        selectedRating,
-        comment,
-        currentAverageRating: mountain.averageRating,
-        currentTotalRatings: mountain.totalRatings
-      });
-
+      
       const updatedMountain = await onSubmitRating(
         mountain.id, 
         selectedRating, 
         comment
       );
-      
-      console.log('Received updated mountain:', {
-        averageRating: updatedMountain.averageRating,
-        totalRatings: updatedMountain.totalRatings,
-        userRating: updatedMountain.userRating
-      });
       
       // Update all rating properties
       mountain.userRating = selectedRating;
@@ -577,36 +515,50 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       mountain.averageRating = updatedMountain.averageRating;
       mountain.totalRatings = updatedMountain.totalRatings;
       
-      console.log('Updated mountain object:', {
-        averageRating: mountain.averageRating,
-        totalRatings: mountain.totalRatings,
-        userRating: mountain.userRating
-      });
-      
-      // Add the new comment to recentComments if it exists
-      if (comment.trim()) {
-        const newComment: Comment = {
-          userId: session?.user?.id || '',
-          userName: session?.user?.name || null,
-          userAvatar: session?.user?.image || null,
-          rating: selectedRating,
-          comment: comment.trim(),
-          createdAt: new Date().toISOString()
-        };
-        mountain.recentComments = [newComment, ...(mountain.recentComments || [])];
-      }
-      
-      // Update completion state since we know it's completed after rating
-      setCurrentState(true);
       setShowRatingPanel(false);
       setShowCompletionModal(false);
       
       toast.success('Rating submitted successfully!');
     } catch (error) {
-      console.error('Error submitting rating:', error);
+      console.error('[MountainCard] Error in handleSubmitRating:', error);
       toast.error('Failed to submit rating');
     } finally {
       setIsSubmitting(false);
+      setIsUpdating(false);
+    }
+  };
+
+  const handleToggle = async () => {
+    if (!session?.user || isUpdating) return;
+    
+    try {
+      console.log('[MountainCard] Starting toggle completion:', {
+        mountainId: mountain.id,
+        currentlyCompleted: initialIsCompleted,
+        willBeCompleted: !initialIsCompleted
+      });
+
+      setIsUpdating(true);
+      await onToggleCompletion(mountain.id, !initialIsCompleted);
+      
+      console.log('[MountainCard] Toggle completion successful:', {
+        mountainId: mountain.id,
+        newCompletedState: !initialIsCompleted
+      });
+
+      // Show celebration animation if marking as completed
+      if (!initialIsCompleted) {
+        setShowCelebration(true);
+        
+        // Show completion modal if hasn't rated yet
+        if (!hasUserRated) {
+          setShowCompletionModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('[MountainCard] Error in handleToggle:', error);
+      toast.error('Failed to update completion status. Please try again.');
+    } finally {
       setIsUpdating(false);
     }
   };
@@ -647,7 +599,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         <MountainCardHeader
           name={mountain.ukHillsDbName}
           categoryId={mountain.MountainCategoryID}
-          isCompleted={currentState}
+          isCompleted={initialIsCompleted}
           isUpdating={isUpdating}
           showToggle={!!session?.user}
           onToggleCompletion={handleToggle}

@@ -124,6 +124,26 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
   const handleToggleCompletion = async (mountainId: number, completed: boolean) => {
     try {
+      console.log('[MountainDirectory] Starting toggle completion:', {
+        mountainId,
+        completed,
+        currentCompletedMountains: completedMountains
+      });
+
+      // Optimistically update the UI
+      setCompletedMountains(prev => {
+        const newState = completed 
+          ? [...prev, mountainId]
+          : prev.filter(id => id !== mountainId);
+        console.log('[MountainDirectory] Updated completedMountains state:', {
+          mountainId,
+          completed,
+          previousState: prev,
+          newState
+        });
+        return newState;
+      });
+
       const response = await fetch('/api/mountains/toggle-completion', {
         method: 'POST',
         headers: {
@@ -137,15 +157,28 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
       });
 
       if (!response.ok) {
+        console.log('[MountainDirectory] API call failed, reverting state');
+        // Revert the optimistic update on error
+        setCompletedMountains(prev => {
+          const revertedState = completed 
+            ? prev.filter(id => id !== mountainId)
+            : [...prev, mountainId];
+          console.log('[MountainDirectory] Reverted completedMountains state:', {
+            mountainId,
+            completed,
+            previousState: prev,
+            revertedState
+          });
+          return revertedState;
+        });
         throw new Error('Failed to update completion status');
       }
 
-      // Only update parent state after successful API call
-      setCompletedMountains(prev => 
-        completed 
-          ? [...prev, mountainId]
-          : prev.filter(id => id !== mountainId)
-      );
+      console.log('[MountainDirectory] Toggle completion successful:', {
+        mountainId,
+        completed,
+        currentCompletedMountains: completedMountains
+      });
 
       // Show success toast
       toast.success(
@@ -154,12 +187,11 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
       );
 
     } catch (error) {
-      // Show error toast
+      console.error('[MountainDirectory] Error in handleToggleCompletion:', error);
       toast.error('Failed to update completion status. Please try again.', {
         duration: 3000,
       });
       
-      // Return false to let the child component know it should revert
       throw error;
     }
   };
@@ -171,7 +203,12 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
   const handleSubmitRating = async (mountainId: number, rating: number, comment: string) => {
     try {
-      console.log('MountainDirectory: Submitting rating with values:', { mountainId, rating, comment });
+      console.log('[MountainDirectory] Starting rating submission:', { 
+        mountainId, 
+        rating, 
+        comment,
+        isCompleted: completedMountains.includes(mountainId)
+      });
       
       const response = await fetch('/api/mountains/rate', {
         method: 'POST',
@@ -192,17 +229,26 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
       // Get the updated mountain data
       const updatedRating = await response.json();
-      console.log('MountainDirectory: Received rating response:', updatedRating);
+      console.log('[MountainDirectory] Rating submission successful:', {
+        mountainId,
+        updatedRating,
+        isCompleted: completedMountains.includes(mountainId)
+      });
+
+      // Update completion state since rating automatically completes the mountain
+      if (!completedMountains.includes(mountainId)) {
+        setCompletedMountains(prev => [...prev, mountainId]);
+      }
 
       // Return the mountain with updated rating values
       return {
         ...updatedRating,
-        averageRating: rating, // For now, just use the submitted rating
-        totalRatings: 1, // Increment by 1
+        averageRating: rating,
+        totalRatings: 1,
         userRating: rating
       };
     } catch (error) {
-      console.error('Error submitting rating:', error);
+      console.error('[MountainDirectory] Error in handleSubmitRating:', error);
       throw error;
     }
   };

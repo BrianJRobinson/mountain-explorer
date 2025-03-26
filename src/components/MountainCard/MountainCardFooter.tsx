@@ -20,7 +20,6 @@ export const MountainCardFooter: React.FC<MountainCardFooterProps> = ({
   onShowComments,
   onShowRatingPanel,
 }) => {
-  console.log("inside footer and rating is", rating);
   return (
     <div className="pt-2 border-t border-gray-700/50 flex items-center justify-between">
       <div className="flex items-center gap-0.5">
