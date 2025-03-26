@@ -7,6 +7,7 @@ import { StarRating } from './shared/StarRating';
 import { formatDistanceToNow } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { ToggleButton } from './shared/ToggleButton';
+import { Navbar } from './Navbar';
 
 interface UserProfileProps {
   user: {
@@ -102,10 +103,11 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-20">
+    <div className="min-h-screen bg-gray-900">
+      <Navbar />
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* User Header */}
-        <div className="bg-gray-800 rounded-xl p-4 sm:p-6 mb-8 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between shadow-lg border border-gray-700/50 animate-float gap-4">
+        <div className="bg-gray-800 rounded-xl p-4 mt-10 sm:p-6 mb-8 flex flex-col sm:flex-row items-start sm:items-center sm:justify-between shadow-lg border border-gray-700/50 animate-float gap-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full">
             <div className="flex items-center gap-4 w-full sm:w-auto">
               <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-orange-500 shadow-lg animate-glow group transition-transform duration-300 hover:scale-105">
@@ -171,12 +173,6 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
               </div>
             </div>
           </div>
-          <Link 
-            href="/"
-            className="text-orange-500 hover:text-orange-400 transition-colors text-sm sm:text-base"
-          >
-            Back to Home ↩
-          </Link>
         </div>
 
         {/* Comments Grid */}

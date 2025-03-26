@@ -5,16 +5,18 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
     const session = await getServerSession(authOptions);
-    const isAuthenticated = !!session?.user?.email;
+    if (!session?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Get all ratings grouped by walk
-    const ratings = await prisma.walkRating.groupBy({
+    // Get all walk ratings with their averages
+    const walkRatings = await prisma.walkRating.groupBy({
       by: ['walkName'],
-      _avg: {
+      _sum: {
         rating: true,
       },
       _count: {
@@ -22,37 +24,18 @@ export async function GET(request: Request) {
       },
     });
 
-    // If userId is provided, get that user's ratings
-    const userRatings = userId
-      ? await prisma.walkRating.findMany({
-          where: {
-            user: {
-              id: userId,
-            },
-          },
-          select: {
-            walkName: true,
-            rating: true,
-            comment: true,
-          },
-        })
-      : [];
+    // Transform the data into a more usable format
+    const ratings = walkRatings.map(rating => ({
+      walkName: rating.walkName,
+      averageRating: rating._sum.rating ? rating._sum.rating / rating._count.rating : 0,
+      totalRatings: rating._count.rating,
+    }));
 
-    // Format the response
-    const formattedRatings = ratings.reduce((acc, walk) => {
-      acc[walk.walkName] = {
-        rating: walk._avg.rating || 0,
-        count: walk._count.rating,
-        userRating: userRatings.find((r) => r.walkName === walk.walkName),
-      };
-      return acc;
-    }, {} as Record<string, any>);
-
-    return NextResponse.json(formattedRatings);
+    return NextResponse.json(ratings);
   } catch (error) {
     console.error('Error fetching walk ratings:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch walk ratings' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

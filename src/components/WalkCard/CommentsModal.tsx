@@ -16,13 +16,13 @@ export interface Comment {
 interface CommentsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mountainId: number;
+  walkName: string;
 }
 
 export const CommentsModal: React.FC<CommentsModalProps> = ({
   isOpen,
   onClose,
-  mountainId,
+  walkName,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +32,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
       const fetchComments = async () => {
         setIsLoading(true);
         try {
-          const response = await fetch(`/api/mountains/comments?mountainId=${mountainId}`);
+          const response = await fetch(`/api/walks/comments?walkName=${encodeURIComponent(walkName)}`);
           if (!response.ok) throw new Error('Failed to fetch comments');
           const data = await response.json();
           setComments(data);
@@ -46,7 +46,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
 
       fetchComments();
     }
-  }, [isOpen, mountainId]);
+  }, [isOpen, walkName]);
 
   if (!isOpen) return null;
 

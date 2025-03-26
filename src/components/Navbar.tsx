@@ -1,13 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { UserAvatar } from './UserAvatar';
 import { NotificationBell } from './shared/NotificationBell';
+import { usePathname } from 'next/navigation';
 
 export const Navbar = () => {
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const isActive = (path: string) => pathname === path;
 
   return (
     <nav className="fixed w-full z-50 bg-gray-900/30 backdrop-blur-md border-b border-gray-800/30">
@@ -15,7 +20,8 @@ export const Navbar = () => {
         <div className="flex flex-col">
           {/* Top row */}
           <div className="flex items-center justify-between h-14">
-            <div className="w-1/3">
+            {/* Logo and Mobile Menu Button */}
+            <div className="flex items-center gap-4">
               <Link href="/" className="text-white text-sm md:text-2xl font-bold flex items-center gap-2">
                 <svg 
                   className="w-8 h-8 text-orange-500" 
@@ -36,10 +42,49 @@ export const Navbar = () => {
                     fillOpacity="0.2"
                   />
                 </svg>
-                Mountain Explorer
+                <span className="hidden sm:inline">Mountain Explorer</span>
+              </Link>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="sm:hidden text-gray-300 hover:text-white"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+            </div>
+
+            {/* Desktop Navigation */}
+            <div className="hidden sm:flex items-center gap-6">
+              <Link
+                href="/mountains"
+                className={`text-sm font-medium transition-colors ${
+                  isActive('/mountains')
+                    ? 'text-orange-500'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Mountains
+              </Link>
+              <Link
+                href="/walks"
+                className={`text-sm font-medium transition-colors ${
+                  isActive('/walks')
+                    ? 'text-orange-500'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Walks
               </Link>
             </div>
             
+            {/* User Actions */}
             <div className="flex items-center gap-4">
               {session?.user ? (
                 <>
@@ -69,6 +114,32 @@ export const Navbar = () => {
                 </>
               )}
             </div>
+          </div>
+
+          {/* Mobile Navigation Menu */}
+          <div className={`sm:hidden ${isMenuOpen ? 'block' : 'hidden'} py-2`}>
+            <Link
+              href="/mountains"
+              className={`block px-4 py-2 text-sm ${
+                isActive('/mountains')
+                  ? 'text-orange-500 bg-gray-800/50'
+                  : 'text-gray-300 hover:bg-gray-800/30 hover:text-white'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Mountains
+            </Link>
+            <Link
+              href="/walks"
+              className={`block px-4 py-2 text-sm ${
+                isActive('/walks')
+                  ? 'text-orange-500 bg-gray-800/50'
+                  : 'text-gray-300 hover:bg-gray-800/30 hover:text-white'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Walks
+            </Link>
           </div>
         </div>
       </div>

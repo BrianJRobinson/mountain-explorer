@@ -60,6 +60,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [hasComments, setHasComments] = useState(false);
 
   // Derived state
   const hasUserRated = !!mountain.userRating;
@@ -69,6 +70,22 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const map = useRef<LeafletMap | null>(null);
   const maplibreMap = useRef<MapLibreMap | null>(null);
   const markers3D = useRef<maplibregl.Marker[]>([]);
+
+  // Check if there are comments when component mounts
+  useEffect(() => {
+    const checkComments = async () => {
+      try {
+        const response = await fetch(`/api/mountains/comments?mountainId=${mountain.id}`);
+        if (!response.ok) throw new Error('Failed to check comments');
+        const comments = await response.json();
+        setHasComments(comments.length > 0);
+      } catch (error) {
+        console.error('Error checking comments:', error);
+      }
+    };
+
+    checkComments();
+  }, [mountain.id]);
 
   // Initialize 3D map
   const initialize3DMap = useCallback(() => {
@@ -515,6 +532,9 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       mountain.averageRating = updatedMountain.averageRating;
       mountain.totalRatings = updatedMountain.totalRatings;
       
+      // Set hasComments to true since we just added a comment
+      setHasComments(true);
+      
       setShowRatingPanel(false);
       setShowCompletionModal(false);
       
@@ -640,7 +660,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
               <MountainCardFooter
                 rating={mountain.averageRating}
                 totalRatings={mountain.totalRatings}
-                hasRecentComments={recentComments.length > 0}
+                hasRecentComments={hasComments}
                 isUserLoggedIn={!!session?.user}
                 hasUserRated={hasUserRated}
                 onShowComments={() => setShowComments(true)}
@@ -677,7 +697,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
           <CommentsModal
             isOpen={showComments}
             onClose={() => setShowComments(false)}
-            comments={recentComments as Comment[]}
+            mountainId={mountain.id}
           />
         )}
       </div>

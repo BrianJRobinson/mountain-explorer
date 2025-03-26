@@ -39,10 +39,10 @@ export default async function HomePage() {
             </>
           )}
           <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6">
-            Explore Scotland's Natural Beauty
+            Explore The UK&apos;s Natural Beauty
           </h1>
           <p className="text-lg leading-8 text-gray-300 mb-16">
-            Choose your adventure - discover Scotland's majestic mountains or explore scenic walking routes.
+            Choose your adventure - discover the UK&apos;s majestic mountains or explore scenic walking routes.
           </p>
 
           {/* Dataset Selection Cards */}
@@ -56,7 +56,7 @@ export default async function HomePage() {
                 </svg>
                 <h2 className="text-2xl font-semibold text-white mb-2">Mountains</h2>
                 <p className="text-gray-400">
-                  Discover and track your progress climbing Scotland's magnificent mountains.
+                  Discover and track your progress climbing the UK&apos;s magnificent mountains.
                 </p>
               </div>
             </Link>
@@ -70,7 +70,7 @@ export default async function HomePage() {
                 </svg>
                 <h2 className="text-2xl font-semibold text-white mb-2">Walks</h2>
                 <p className="text-gray-400">
-                  Explore scenic walking routes throughout Scotland's beautiful landscapes.
+                  Explore scenic walking routes throughout the UK&apos;s beautiful landscapes.
                 </p>
               </div>
             </Link>

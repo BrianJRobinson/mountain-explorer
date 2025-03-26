@@ -21,10 +21,9 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const completedWalks = user.walkProgress.reduce((acc, walk) => {
-      acc[walk.walkName] = true;
-      return acc;
-    }, {} as Record<string, boolean>);
+    const completedWalks = user.walkProgress.map(walk => ({
+      walkName: walk.walkName
+    }));
 
     return NextResponse.json(completedWalks);
   } catch (error) {
