@@ -44,6 +44,7 @@ export const RatingPanel: React.FC<RatingPanelProps> = ({
         <StarRating
           rating={selectedRating}
           interactive={!readOnly}
+          editable={true}
           disabled={readOnly}
           size="lg"
           onChange={readOnly ? undefined : onRatingChange}

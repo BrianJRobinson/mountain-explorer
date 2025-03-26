@@ -171,6 +171,8 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
   const handleSubmitRating = async (mountainId: number, rating: number, comment: string) => {
     try {
+      console.log('MountainDirectory: Submitting rating with values:', { mountainId, rating, comment });
+      
       const response = await fetch('/api/mountains/rate', {
         method: 'POST',
         headers: {
@@ -188,7 +190,17 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         throw new Error(data.error || 'Failed to submit rating');
       }
 
-      return response.json();
+      // Get the updated mountain data
+      const updatedRating = await response.json();
+      console.log('MountainDirectory: Received rating response:', updatedRating);
+
+      // Return the mountain with updated rating values
+      return {
+        ...updatedRating,
+        averageRating: rating, // For now, just use the submitted rating
+        totalRatings: 1, // Increment by 1
+        userRating: rating
+      };
     } catch (error) {
       console.error('Error submitting rating:', error);
       throw error;

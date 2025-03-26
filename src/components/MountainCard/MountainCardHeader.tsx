@@ -34,10 +34,7 @@ export const MountainCardHeader: React.FC<MountainCardHeaderProps> = ({
   onToggleCompletion,
 }) => {
   return (
-    <div className={`
-      h-38 bg-cover bg-center relative
-      ${isCompleted ? 'animate-completion' : ''}
-    `}
+    <div className="h-38 bg-cover bg-center relative"
       style={{
         backgroundImage: `url(${getCategoryImage(categoryId)})`
       }}
@@ -72,16 +69,6 @@ export const MountainCardHeader: React.FC<MountainCardHeaderProps> = ({
           {name}
         </h3>
       </div>
-
-      {/* Completion celebration overlay */}
-      {isCompleted && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-0 bg-gradient-to-b from-orange-500/20 to-transparent animate-fade-out" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-orange-500/30 animate-pulse-slow" />
-          </div>
-        </div>
-      )}
     </div>
   );
 }; 

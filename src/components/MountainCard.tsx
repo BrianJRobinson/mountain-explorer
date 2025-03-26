@@ -23,7 +23,7 @@ interface MountainCardProps {
   isInitialLoading?: boolean;
   allMountains: Mountain[];
   onMapMarkerClick?: (mountainName: string) => void;
-  onSubmitRating: (mountainId: number, rating: number, comment: string) => Promise<void>;
+  onSubmitRating: (mountainId: number, rating: number, comment: string) => Promise<Mountain>;
 }
 
 // Dynamic imports for mapping libraries
@@ -64,79 +64,22 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const ignoreNextPropChange = useRef(false);
 
   // Derived state
-  const mountainData = mountain;
-  const rating = mountainData.averageRating;
-  const hasUserRated = !!mountainData.userRating;
-  const userRating = mountainData.userRating;
-  const recentComments = mountainData.recentComments || [];
+  //const rating = mountain.averageRating;
+  const hasUserRated = !!mountain.userRating;
+  const userRating = mountain.userRating;
+  const recentComments = mountain.recentComments || [];
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
   const maplibreMap = useRef<MapLibreMap | null>(null);
   const markers3D = useRef<maplibregl.Marker[]>([]);
 
-  // Update mountainData when mountain prop changes
+  // Update currentState when initialIsCompleted changes
   useEffect(() => {
-    setCurrentState(initialIsCompleted);
+    if (!ignoreNextPropChange.current) {
+      setCurrentState(initialIsCompleted);
+    }
+    ignoreNextPropChange.current = false;
   }, [initialIsCompleted]);
-
-  const handleToggle = async () => {
-    if (!session?.user || isUpdating) return;
-
-    const newState = !currentState;
-    
-    try {
-      // Set flag to ignore the next prop change since we're triggering it
-      ignoreNextPropChange.current = true;
-      
-      // Update visual state immediately
-      setCurrentState(newState);
-      setIsUpdating(true);
-
-      // Call the API to save the completion status
-      await onToggleCompletion(mountainData.id, newState);
-      
-      // Keep our flag true since the API succeeded
-      ignoreNextPropChange.current = true;
-      
-      // Show celebration animation if marking as completed
-      if (newState) {
-        setShowCelebration(true);
-      }
-      
-      // Only show modals if marking as completed AND hasn't rated yet
-      if (newState && !hasUserRated) {
-        setShowCompletionModal(true);
-      }
-    } catch {
-      // If the API call fails, revert the visual state
-      setCurrentState(!newState);
-      // Reset our flag since we want to sync with the server state
-      ignoreNextPropChange.current = false;
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleSubmitRating = async () => {
-    if (!selectedRating) return;
-
-    try {
-      setIsSubmitting(true);
-      await onSubmitRating(mountainData.id, selectedRating, comment);
-      
-      // Update the state
-      setCurrentState(true);
-      setIsUpdating(true);
-      
-      toast.success('Rating submitted successfully!');
-      setShowRatingPanel(false);
-    } catch (error) {
-      console.error('Error submitting rating:', error);
-      toast.error('Failed to submit rating');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // Initialize 3D map
   const initialize3DMap = useCallback(() => {
@@ -156,8 +99,8 @@ export const MountainCard: React.FC<MountainCardProps> = ({
       maplibreMap.current = null;
     }
 
-    const lat = parseFloat(mountainData.ukHillsDbLatitude);
-    const lng = parseFloat(mountainData.ukHillsDbLongitude);
+    const lat = parseFloat(mountain.ukHillsDbLatitude);
+    const lng = parseFloat(mountain.ukHillsDbLongitude);
 
     // Add styles for 3D markers
     const style = document.createElement('style');
@@ -255,7 +198,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         el.className = 'mountain-marker';
         el.innerHTML = `
           <div class="w-6 h-6 bg-orange-500 rounded-full border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-pointer hover:bg-orange-600 transition-colors">
-            ${m.id === mountainData.id ? '<div class="w-2 h-2 bg-white rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>' : ''}
+            ${m.id === mountain.id ? '<div class="w-2 h-2 bg-white rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>' : ''}
           </div>
         `;
 
@@ -291,7 +234,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
 
         markers3D.current.push(marker);
 
-        if (m.id === mountainData.id) {
+        if (m.id === mountain.id) {
           marker.togglePopup();
         }
       });
@@ -404,7 +347,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
 
     // Add the controls directly to the map container
     mapContainer.current.appendChild(terrainControls);
-  }, [mountainData, allMountains, onMapMarkerClick]);
+  }, [mountain, allMountains, onMapMarkerClick]);
 
   // Initialize map when modal opens
   useEffect(() => {
@@ -430,8 +373,8 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         map.current = null;
       }
       
-      const lat = parseFloat(mountainData.ukHillsDbLatitude);
-      const lng = parseFloat(mountainData.ukHillsDbLongitude);
+      const lat = parseFloat(mountain.ukHillsDbLatitude);
+      const lng = parseFloat(mountain.ukHillsDbLongitude);
 
       // Initialize map centered on the current mountain with closer zoom
       map.current = L.map(mapContainer.current, {
@@ -509,7 +452,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
             );
 
           // Highlight the current mountain's marker
-          if (m.id === mountainData.id) {
+          if (m.id === mountain.id) {
             marker.setZIndexOffset(1000); // Bring to front
             marker.openPopup();
           }
@@ -563,7 +506,110 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         style.remove();
       }
     };
-  }, [showMap, is3DMode, mountainData.ukHillsDbLatitude, mountainData.ukHillsDbLongitude, mountainData.ukHillsDbName, mountainData.id, allMountains, onMapMarkerClick, initialize3DMap]);
+  }, [showMap, is3DMode, mountain.ukHillsDbLatitude, mountain.ukHillsDbLongitude, mountain.ukHillsDbName, mountain.id, allMountains, onMapMarkerClick, initialize3DMap]);
+
+  const handleToggle = async () => {
+    if (!session?.user || isUpdating) return;
+
+    const newState = !currentState;
+    
+    try {
+      // Set flag to ignore the next prop change since we're triggering it
+      ignoreNextPropChange.current = true;
+      
+      // Update visual state immediately
+      setCurrentState(newState);
+      setIsUpdating(true);
+
+      // Call the API to save the completion status
+      await onToggleCompletion(mountain.id, newState);
+      
+      // Keep our flag true since the API succeeded
+      ignoreNextPropChange.current = true;
+      
+      // Show celebration animation if marking as completed
+      if (newState) {
+        setShowCelebration(true);
+        
+        // Show completion modal if hasn't rated yet
+        if (!hasUserRated) {
+          setShowCompletionModal(true);
+        }
+      }
+    } catch {
+      // If the API call fails, revert the visual state
+      setCurrentState(!newState);
+      // Reset our flag since we want to sync with the server state
+      ignoreNextPropChange.current = false;
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!selectedRating) return;
+
+    try {
+      setIsSubmitting(true);
+      console.log('Submitting rating with values:', {
+        mountainId: mountain.id,
+        selectedRating,
+        comment,
+        currentAverageRating: mountain.averageRating,
+        currentTotalRatings: mountain.totalRatings
+      });
+
+      const updatedMountain = await onSubmitRating(
+        mountain.id, 
+        selectedRating, 
+        comment
+      );
+      
+      console.log('Received updated mountain:', {
+        averageRating: updatedMountain.averageRating,
+        totalRatings: updatedMountain.totalRatings,
+        userRating: updatedMountain.userRating
+      });
+      
+      // Update all rating properties
+      mountain.userRating = selectedRating;
+      mountain.userComment = comment.trim() || undefined;
+      mountain.averageRating = updatedMountain.averageRating;
+      mountain.totalRatings = updatedMountain.totalRatings;
+      
+      console.log('Updated mountain object:', {
+        averageRating: mountain.averageRating,
+        totalRatings: mountain.totalRatings,
+        userRating: mountain.userRating
+      });
+      
+      // Add the new comment to recentComments if it exists
+      if (comment.trim()) {
+        const newComment: Comment = {
+          userId: session?.user?.id || '',
+          userName: session?.user?.name || null,
+          userAvatar: session?.user?.image || null,
+          rating: selectedRating,
+          comment: comment.trim(),
+          createdAt: new Date().toISOString()
+        };
+        mountain.recentComments = [newComment, ...(mountain.recentComments || [])];
+      }
+      
+      // Update completion state since we know it's completed after rating
+      setCurrentState(true);
+      setShowRatingPanel(false);
+      setShowCompletionModal(false);
+      
+      toast.success('Rating submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      toast.error('Failed to submit rating');
+    } finally {
+      setIsSubmitting(false);
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <>
@@ -599,20 +645,27 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         )}
         
         <MountainCardHeader
-          name={mountainData.ukHillsDbName}
-          categoryId={mountainData.MountainCategoryID}
+          name={mountain.ukHillsDbName}
+          categoryId={mountain.MountainCategoryID}
           isCompleted={currentState}
           isUpdating={isUpdating}
           showToggle={!!session?.user}
           onToggleCompletion={handleToggle}
         />
 
+        {/* Debug Mountain ID - Only shown in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="absolute top-0 right-0 bg-orange-500/20 text-orange-500 text-xs px-2 py-1 rounded-bl-lg">
+            ID: {mountain.id}
+          </div>
+        )}
+
         {/* Content Section - Fixed height */}
         <div className="h-[240px] bg-gradient-to-b from-gray-800 to-gray-900">
           {showRatingPanel ? (
             <RatingPanel
               selectedRating={hasUserRated ? userRating : selectedRating}
-              comment={hasUserRated ? (mountainData.userComment || '') : comment}
+              comment={hasUserRated ? (mountain.userComment || '') : comment}
               isSubmitting={isSubmitting}
               readOnly={hasUserRated}
               onClose={() => setShowRatingPanel(false)}
@@ -624,17 +677,17 @@ export const MountainCard: React.FC<MountainCardProps> = ({
             <div className="h-full p-4 flex flex-col">
               {/* Mountain Details Content */}
               <MountainDetails
-                height={mountainData.Height}
-                latitude={mountainData.ukHillsDbLatitude}
-                longitude={mountainData.ukHillsDbLongitude}
-                region={mountainData.ukHillsDbSection}
+                height={mountain.Height}
+                latitude={mountain.ukHillsDbLatitude}
+                longitude={mountain.ukHillsDbLongitude}
+                region={mountain.ukHillsDbSection}
                 onShowMap={() => setShowMap(true)}
               />
 
               {/* Rating Stars and Comment Button */}
               <MountainCardFooter
-                rating={rating}
-                totalRatings={mountainData.totalRatings}
+                rating={mountain.averageRating}
+                totalRatings={mountain.totalRatings}
                 hasRecentComments={recentComments.length > 0}
                 isUserLoggedIn={!!session?.user}
                 hasUserRated={hasUserRated}
@@ -658,7 +711,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         {showCompletionModal && (
           <CompletionModal
             isOpen={showCompletionModal}
-            mountainName={mountainData.ukHillsDbName}
+            mountainName={mountain.ukHillsDbName}
             onConfirm={() => setShowCompletionModal(false)}
             onSkip={() => setShowCompletionModal(false)}
             onRateAndComment={() => {
@@ -679,7 +732,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
 
       {showCelebration && (
         <CompletionCelebration
-          mountainName={mountainData.ukHillsDbName}
           onComplete={() => setShowCelebration(false)}
         />
       )}

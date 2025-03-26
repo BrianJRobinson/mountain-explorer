@@ -22,27 +22,66 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upsert the rating (create or update)
-    const mountainRating = await prisma.mountainRating.upsert({
-      where: {
-        userId_mountainId: {
+    // Use a transaction to ensure both operations succeed or fail together
+    const result = await prisma.$transaction(async (tx) => {
+      // Upsert the rating (create or update)
+      const mountainRating = await tx.mountainRating.upsert({
+        where: {
+          userId_mountainId: {
+            userId: session.user.id,
+            mountainId: mountainId,
+          },
+        },
+        update: {
+          rating,
+          comment,
+        },
+        create: {
+          userId: session.user.id,
+          mountainId: mountainId,
+          rating,
+          comment,
+        },
+      });
+
+      // Always set completion to true when rating
+      await tx.mountainCompletion.upsert({
+        where: {
+          userId_mountainId: {
+            userId: session.user.id,
+            mountainId: mountainId,
+          },
+        },
+        update: {},
+        create: {
           userId: session.user.id,
           mountainId: mountainId,
         },
-      },
-      update: {
-        rating,
-        comment,
-      },
-      create: {
-        userId: session.user.id,
-        mountainId: mountainId,
-        rating,
-        comment,
-      },
+      });
+
+      // Get the updated average rating
+      const ratings = await tx.mountainRating.aggregate({
+        where: {
+          mountainId: mountainId,
+        },
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      });
+
+      return {
+        ...mountainRating,
+        averageRating: ratings._avg.rating || rating,
+        totalRatings: ratings._count.rating || 1,
+        userRating: rating
+      };
     });
 
-    return NextResponse.json(mountainRating);
+    console.log('API: Returning rating result:', result);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Error in rating mountain:', error);
     return NextResponse.json(
