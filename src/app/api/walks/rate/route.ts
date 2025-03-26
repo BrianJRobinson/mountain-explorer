@@ -6,52 +6,86 @@ import prisma from '@/lib/prisma';
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     const { walkName, rating, comment } = await request.json();
 
-    if (!walkName || typeof rating !== 'number' || rating < 1 || rating > 5) {
+    if (!walkName || !rating || rating < 0.5 || rating > 5) {
       return NextResponse.json(
-        { error: 'Invalid walk name or rating' },
+        { error: 'Invalid rating data' },
         { status: 400 }
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
+    // Use a transaction to ensure both operations succeed or fail together
+    const result = await prisma.$transaction(async (tx) => {
+      // Upsert the rating (create or update)
+      const walkRating = await tx.walkRating.upsert({
+        where: {
+          userId_walkName: {
+            userId: session.user.id,
+            walkName: walkName,
+          },
+        },
+        update: {
+          rating,
+          comment,
+        },
+        create: {
+          userId: session.user.id,
+          walkName: walkName,
+          rating,
+          comment,
+        },
+      });
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Upsert the rating
-    const updatedRating = await prisma.walkRating.upsert({
-      where: {
-        userId_walkName: {
-          userId: user.id,
+      // Always set completion to true when rating
+      await tx.walkCompletion.upsert({
+        where: {
+          userId_walkName: {
+            userId: session.user.id,
+            walkName: walkName,
+          },
+        },
+        update: {},
+        create: {
+          userId: session.user.id,
           walkName: walkName,
         },
-      },
-      update: {
-        rating,
-        comment,
-      },
-      create: {
-        userId: user.id,
-        walkName,
-        rating,
-        comment,
-      },
+      });
+
+      // Get the updated average rating
+      const ratings = await tx.walkRating.aggregate({
+        where: {
+          walkName: walkName,
+        },
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      });
+
+      return {
+        ...walkRating,
+        averageRating: ratings._avg.rating || rating,
+        totalRatings: ratings._count.rating || 1,
+        userRating: rating
+      };
     });
 
-    return NextResponse.json(updatedRating);
+    console.log('API: Returning rating result:', result);
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Error rating walk:', error);
+    console.error('Error in rating walk:', error);
     return NextResponse.json(
-      { error: 'Failed to rate walk' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

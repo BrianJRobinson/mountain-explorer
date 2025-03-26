@@ -221,13 +221,8 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
         setCompletedWalks(prev => [...prev, walkName]);
       }
 
-      // Return the walk with updated rating values
-      return {
-        ...updatedRating,
-        averageRating: rating,
-        totalRatings: 1,
-        userRating: rating
-      };
+      // Return the walk with updated rating values from the API
+      return updatedRating;
     } catch (error) {
       console.error('[WalkDirectory] Error in handleSubmitRating:', error);
       throw error;

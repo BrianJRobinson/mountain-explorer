@@ -23,7 +23,7 @@ export const WalkCardFooter: React.FC<WalkCardFooterProps> = ({
   return (
     <div className="pt-2 border-t border-gray-700/50 flex items-center justify-between">
       <div className="flex items-center gap-0.5">
-        {rating === undefined ? (
+        {!rating || rating === 0 ? (
           <span className="text-sm text-gray-500">Not Rated</span>
         ) : (
           <>
@@ -32,7 +32,7 @@ export const WalkCardFooter: React.FC<WalkCardFooterProps> = ({
               size="sm"
             />
             <span className="text-sm text-gray-400 ml-1">
-              ({totalRatings})
+              ({totalRatings || 0})
             </span>
           </>
         )}

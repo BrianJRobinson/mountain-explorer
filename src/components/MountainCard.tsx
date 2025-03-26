@@ -12,7 +12,7 @@ import { RatingPanel } from './MountainCard/RatingPanel';
 import { MountainCardFooter } from './MountainCard/MountainCardFooter';
 import { MountainMap } from './MountainCard/MountainMap';
 import { CompletionModal } from './MountainCard/CompletionModal';
-import { CommentsModal, type Comment } from './MountainCard/CommentsModal';
+import { CommentsModal } from './MountainCard/CommentsModal';
 import { CompletionCelebration } from './shared/CompletionCelebration';
 import { loadMapLibraries } from '@/lib/mapLibraries';
 
@@ -65,7 +65,6 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   // Derived state
   const hasUserRated = !!mountain.userRating;
   const userRating = mountain.userRating;
-  const recentComments = mountain.recentComments || [];
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
   const maplibreMap = useRef<MapLibreMap | null>(null);

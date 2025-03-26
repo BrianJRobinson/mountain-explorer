@@ -5,6 +5,14 @@ import prisma from '@/lib/prisma';
 
 export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    
     const { searchParams } = new URL(request.url);
     const walkName = searchParams.get('walkName');
 

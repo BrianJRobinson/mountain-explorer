@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
     const count = await prisma.mountainRating.count({
       where: {
-        mountainId: mountainId,
+        mountainId: parseInt(mountainId),
         comment: {
           not: null
         }

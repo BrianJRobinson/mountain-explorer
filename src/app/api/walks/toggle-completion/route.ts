@@ -1,63 +1,84 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/auth-options';
+import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+//import { createWalkCompletionNotifications } from '@/lib/notifications';
 
 export async function POST(request: Request) {
   try {
+    console.log('[WalkToggle] Request received');
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    logger.info('Toggle completion request received', { session }, session?.user?.id, 'auth:session');
+    console.log('[WalkToggle] Session:', { 
+      hasUser: !!session?.user,
+      userEmail: session?.user?.email,
+      userId: session?.user?.id 
+    });
+    if (!session?.user) {
+      logger.warn('Unauthorized toggle attempt', {}, undefined, 'auth:unauthorized');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { walkName } = await request.json();
-    if (!walkName) {
-      return NextResponse.json({ error: 'Walk name is required' }, { status: 400 });
+    const { walkName, completed, userId } = await request.json();
+    logger.info('Toggle request details', { walkName, completed, userId }, userId, 'walk:toggle');
+
+    if (!walkName || typeof completed !== 'boolean' || !userId) {
+      logger.warn('Invalid request parameters', { walkName, completed, userId }, userId, 'walk:invalid');
+      return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (userId !== session.user.id) {
+      logger.warn('User ID mismatch', { requestUserId: userId, sessionUserId: session.user.id }, session.user.id, 'auth:mismatch');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if the walk is already completed
-    const existingCompletion = await prisma.walkCompletion.findUnique({
-      where: {
-        userId_walkName: {
-          userId: user.id,
-          walkName: walkName,
-        },
-      },
-    });
-
-    if (existingCompletion) {
-      // If completed, remove the completion
-      await prisma.walkCompletion.delete({
-        where: {
-          userId_walkName: {
-            userId: user.id,
-            walkName: walkName,
+    let result;
+    try {
+      console.log("Completed value is " + completed);
+      if (completed) {
+        result = await prisma.walkCompletion.create({
+          data: {
+            userId,
+            walkName,
           },
-        },
-      });
-      return NextResponse.json({ completed: false });
-    } else {
-      // If not completed, add the completion
-      await prisma.walkCompletion.create({
-        data: {
-          userId: user.id,
-          walkName: walkName,
-        },
-      });
-      return NextResponse.json({ completed: true });
+        });
+        logger.info('Walk completion created', result, userId, 'walk:completed');
+
+        // Create notifications for followers
+        //await createWalkCompletionNotifications(userId, walkName);
+      } else {
+        result = await prisma.walkCompletion.delete({
+          where: {
+            userId_walkName: {
+              userId,
+              walkName,
+            },
+          },
+        });
+        logger.info('Walk completion deleted', result, userId, 'walk:uncompleted');
+      }
+    } catch (dbError) {
+      logger.error('Database operation failed', { 
+        error: dbError, 
+        operation: completed ? 'create' : 'delete',
+        walkName,
+        userId
+      }, userId, 'walk:db_error');
+      throw dbError;
     }
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Error toggling walk completion:', error);
+    logger.error('Toggle completion error', { 
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      errorName: error instanceof Error ? error.name : undefined
+    }, undefined, 'mountain:error');
+    
     return NextResponse.json(
-      { error: 'Failed to toggle walk completion' },
+      { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

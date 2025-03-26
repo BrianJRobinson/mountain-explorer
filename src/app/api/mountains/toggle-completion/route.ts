@@ -7,6 +7,7 @@ import { createMountainCompletionNotifications } from '@/lib/notifications';
 
 export async function POST(request: Request) {
   try {
+    console.log('[WalkToggle] Request received');
     const session = await getServerSession(authOptions);
     logger.info('Toggle completion request received', { session }, session?.user?.id, 'auth:session');
 
