@@ -14,9 +14,9 @@ import { WalkCardFooter } from './WalkCard/WalkCardFooter';
 interface WalkCardProps {
   walk: Walk;
   isCompleted?: boolean;
-  onToggleCompletion: (walkName: string, completed: boolean) => Promise<void>;
+  onToggleCompletion: (walkId: number, completed: boolean) => Promise<void>;
   isInitialLoading?: boolean;
-  onSubmitRating: (walkName: string, rating: number, comment: string) => Promise<Walk>;
+  onSubmitRating: (walkId: number, rating: number, comment: string) => Promise<Walk>;
 }
 
 export const WalkCard: React.FC<WalkCardProps> = ({
@@ -45,17 +45,17 @@ export const WalkCard: React.FC<WalkCardProps> = ({
   useEffect(() => {
     const checkComments = async () => {
       try {
-        const response = await fetch(`/api/walks/comments?walkName=${encodeURIComponent(walk.name)}`);
+        const response = await fetch(`/api/walks/comments/count?walkId=${walk.id}`);
         if (!response.ok) throw new Error('Failed to check comments');
-        const comments = await response.json();
-        setHasComments(comments.length > 0);
+        const data = await response.json();
+        setHasComments(data.count > 0);
       } catch (error) {
         console.error('Error checking comments:', error);
       }
     };
 
     checkComments();
-  }, [walk.name]);
+  }, [walk.id]);
 
   const handleSubmitRating = async () => {
     if (!selectedRating) return;
@@ -64,7 +64,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
       setIsSubmitting(true);
       
       const updatedWalk = await onSubmitRating(
-        walk.name, 
+        walk.id, 
         selectedRating, 
         comment
       );
@@ -74,29 +74,11 @@ export const WalkCard: React.FC<WalkCardProps> = ({
       walk.userComment = comment.trim() || undefined;
       walk.averageRating = updatedWalk.averageRating;
       walk.totalRatings = updatedWalk.totalRatings;
-      console.log('[WalkCard] Updated walk:', { recentComments: updatedWalk.recentComments });
-
-      // Add the new comment to recentComments if a comment was provided
-      if (comment.trim() && session?.user) {
-        const newComment = {
-          userId: session.user.id,
-          userName: session.user.name || null,
-          userAvatar: session.user.image || null,
-          rating: selectedRating,
-          comment: comment.trim(),
-          createdAt: new Date().toISOString()
-        };
-        
-        walk.recentComments = walk.recentComments || [];
-        walk.recentComments.unshift(newComment);
-        // Keep only the 5 most recent comments
-        if (walk.recentComments.length > 5) {
-          walk.recentComments.pop();
-        }
-      }
       
-      // Set hasComments to true since we just added a comment
-      setHasComments(true);
+      // Set hasComments to true if a comment was provided
+      if (comment.trim()) {
+        setHasComments(true);
+      }
       
       setShowRatingPanel(false);
       setShowCompletionModal(false);
@@ -116,7 +98,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
     
     try {
       setIsUpdating(true);
-      await onToggleCompletion(walk.name, !initialIsCompleted);
+      await onToggleCompletion(walk.id, !initialIsCompleted);
 
       // Show celebration animation if marking as completed
       if (!initialIsCompleted) {
@@ -134,6 +116,9 @@ export const WalkCard: React.FC<WalkCardProps> = ({
       setIsUpdating(false);
     }
   };
+
+  // Format distance string
+  const distanceString = `${walk.Distance_K} kms / ${walk.Distance_M} miles`;
 
   return (
     <>
@@ -213,7 +198,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
               <div className="flex-1">
                 <div className="space-y-2">
                   <p className="text-gray-300">
-                    <span className="text-gray-500">Distance:</span> {walk.distance}
+                    <span className="text-gray-500">Distance:</span> {distanceString}
                   </p>
                   <p className="text-gray-300">
                     <span className="text-gray-500">OS Maps:</span> {walk.namedOnOSMaps || 'Not specified'}
@@ -227,7 +212,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
                     rel="noopener noreferrer"
                     className="text-orange-400 hover:text-orange-300 text-sm"
                   >
-                    View on LDWA →
+                    View on LDWA
                   </a>
                 </div>
               </div>
@@ -262,7 +247,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
           <CommentsModal
             isOpen={showComments}
             onClose={() => setShowComments(false)}
-            walkName={walk.name}
+            walkId={walk.id}
           />
         )}
       </div>

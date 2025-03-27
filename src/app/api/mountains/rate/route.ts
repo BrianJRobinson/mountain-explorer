@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/auth-options';
 import prisma from '@/lib/prisma';
+import { createMountainCompletionNotifications } from '@/lib/notifications';
 
 export async function POST(request: Request) {
   try {
@@ -79,6 +80,9 @@ export async function POST(request: Request) {
         userRating: rating
       };
     });
+
+    // Create notification after the transaction succeeds
+    await createMountainCompletionNotifications(session.user.id, mountainId);
 
     console.log('API: Returning rating result:', result);
     return NextResponse.json(result);

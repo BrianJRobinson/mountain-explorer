@@ -13,7 +13,8 @@ interface Notification {
     name: string | null;
     avatar: string | null;
   };
-  mountainId?: number;
+  datasetId: number;  // 1 for mountains, 2 for walks, 99 for follows
+  activityId?: number;
 }
 
 export function NotificationBell() {
@@ -86,11 +87,15 @@ export function NotificationBell() {
   };
 
   const getNotificationText = (notification: Notification) => {
-    switch (notification.type) {
-      case 'MOUNTAIN_COMPLETED':
+    if (notification.type === 'FOLLOWED') {
+      return 'started following you';
+    }
+    
+    switch (notification.datasetId) {
+      case 1:
         return 'completed a mountain';
-      case 'FOLLOWED':
-        return 'started following you';
+      case 2:
+        return 'completed a walk';
       default:
         return 'performed an action';
     }

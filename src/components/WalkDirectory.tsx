@@ -11,7 +11,7 @@ interface WalkDirectoryProps {
 }
 
 interface WalkCompletion {
-  walkName: string;
+  walkId: number;
 }
 
 export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
@@ -19,7 +19,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
   const [showCompletedOnly, setShowCompletedOnly] = useState<boolean | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [completedWalks, setCompletedWalks] = useState<string[]>([]);
+  const [completedWalks, setCompletedWalks] = useState<number[]>([]);
   const [isLoadingCompletions, setIsLoadingCompletions] = useState(true);
   const [columnCount, setColumnCount] = useState(4); // Default to 5 columns
   const parentRef = useRef<HTMLDivElement>(null);
@@ -62,7 +62,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
       
       if (response.ok) {
         const data = await response.json();
-        setCompletedWalks(data.map((completion: WalkCompletion) => completion.walkName));
+        setCompletedWalks(data.map((completion: WalkCompletion) => completion.walkId));
       } else {
         const errorData = await response.json();
         console.error('Failed to fetch completed walks:', {
@@ -108,10 +108,10 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
     return () => window.removeEventListener('resize', updateColumnCount);
   }, []);
 
-  const handleToggleCompletion = async (walkName: string, completed: boolean) => {
+  const handleToggleCompletion = async (walkId: number, completed: boolean) => {
     try {
       console.log('[WalkDirectory] Starting toggle completion:', {
-        walkName,
+        walkId,
         completed,
         currentCompletedWalks: completedWalks
       });
@@ -119,10 +119,10 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
       // Optimistically update the UI
       setCompletedWalks(prev => {
         const newState = completed 
-          ? [...prev, walkName]
-          : prev.filter(name => name !== walkName);
+          ? [...prev, walkId]
+          : prev.filter(id => id !== walkId);
         console.log('[WalkDirectory] Updated completedWalks state:', {
-          walkName,
+          walkId,
           completed,
           previousState: prev,
           newState
@@ -136,7 +136,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          walkName, 
+          walkId, 
           completed,
           userId: session?.user?.id 
         }),
@@ -147,10 +147,10 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
         // Revert the optimistic update on error
         setCompletedWalks(prev => {
           const revertedState = completed 
-            ? prev.filter(name => name !== walkName)
-            : [...prev, walkName];
+            ? prev.filter(id => id !== walkId)
+            : [...prev, walkId];
           console.log('[WalkDirectory] Reverted completedWalks state:', {
-            walkName,
+            walkId,
             completed,
             previousState: prev,
             revertedState
@@ -161,7 +161,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
       }
 
       console.log('[WalkDirectory] Toggle completion successful:', {
-        walkName,
+        walkId,
         completed,
         currentCompletedWalks: completedWalks
       });
@@ -182,13 +182,13 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
     }
   };
 
-  const handleSubmitRating = async (walkName: string, rating: number, comment: string) => {
+  const handleSubmitRating = async (walkId: number, rating: number, comment: string) => {
     try {
       console.log('[WalkDirectory] Starting rating submission:', { 
-        walkName, 
+        walkId, 
         rating, 
         comment,
-        isCompleted: completedWalks.includes(walkName)
+        isCompleted: completedWalks.includes(walkId)
       });
       
       const response = await fetch('/api/walks/rate', {
@@ -197,7 +197,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          walkName,
+          walkId,
           rating,
           comment: comment.trim() || null
         }),
@@ -211,14 +211,14 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
       // Get the updated walk data
       const updatedRating = await response.json();
       console.log('[WalkDirectory] Rating submission successful:', {
-        walkName,
+        walkId,
         updatedRating,
-        isCompleted: completedWalks.includes(walkName)
+        isCompleted: completedWalks.includes(walkId)
       });
 
       // Update completion state since rating automatically completes the walk
-      if (!completedWalks.includes(walkName)) {
-        setCompletedWalks(prev => [...prev, walkName]);
+      if (!completedWalks.includes(walkId)) {
+        setCompletedWalks(prev => [...prev, walkId]);
       }
 
       // Return the walk with updated rating values from the API
@@ -231,7 +231,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
 
   const filteredWalks = walks.filter(walk => {
     const matchesSearch = walk.name.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesCompleted = showCompletedOnly === false || showCompletedOnly === null || completedWalks.includes(walk.name);
+    const matchesCompleted = showCompletedOnly === false || showCompletedOnly === null || completedWalks.includes(walk.id);
     return matchesSearch && matchesCompleted;
   });
 
@@ -331,9 +331,9 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
                 >
                   {rowWalks.map((walk) => (
                     <WalkCard
-                      key={walk.name}
+                      key={walk.id}
                       walk={walk}
-                      isCompleted={completedWalks.includes(walk.name)}
+                      isCompleted={completedWalks.includes(walk.id)}
                       onToggleCompletion={handleToggleCompletion}
                       isInitialLoading={status === 'authenticated' && isLoadingCompletions}
                       onSubmitRating={handleSubmitRating}

@@ -4,15 +4,15 @@ import prisma from '@/lib/prisma';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const walkName = searchParams.get('walkName');
+    const walkId = searchParams.get('walkId');
 
-    if (!walkName) {
-      return NextResponse.json({ error: 'Walk name is required' }, { status: 400 });
+    if (!walkId) {
+      return NextResponse.json({ error: 'Walk ID is required' }, { status: 400 });
     }
 
     const count = await prisma.walkRating.count({
       where: {
-        walkName: walkName,
+        walkId: parseInt(walkId),
         comment: {
           not: null
         }

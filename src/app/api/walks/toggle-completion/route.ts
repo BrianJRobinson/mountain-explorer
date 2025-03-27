@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-//import { createWalkCompletionNotifications } from '@/lib/notifications';
+import { createWalkCompletionNotifications } from '@/lib/notifications';
 
 export async function POST(request: Request) {
   try {
@@ -20,11 +20,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { walkName, completed, userId } = await request.json();
-    logger.info('Toggle request details', { walkName, completed, userId }, userId, 'walk:toggle');
+    const { walkId, completed, userId } = await request.json();
+    logger.info('Toggle request details', { walkId, completed, userId }, userId, 'walk:toggle');
 
-    if (!walkName || typeof completed !== 'boolean' || !userId) {
-      logger.warn('Invalid request parameters', { walkName, completed, userId }, userId, 'walk:invalid');
+    if (!walkId || typeof completed !== 'boolean' || !userId) {
+      logger.warn('Invalid request parameters', { walkId, completed, userId }, userId, 'walk:invalid');
       return NextResponse.json({ error: 'Invalid request parameters' }, { status: 400 });
     }
 
@@ -40,19 +40,19 @@ export async function POST(request: Request) {
         result = await prisma.walkCompletion.create({
           data: {
             userId,
-            walkName,
+            walkId,
           },
         });
         logger.info('Walk completion created', result, userId, 'walk:completed');
 
         // Create notifications for followers
-        //await createWalkCompletionNotifications(userId, walkName);
+        await createWalkCompletionNotifications(userId, walkId);
       } else {
         result = await prisma.walkCompletion.delete({
           where: {
-            userId_walkName: {
+            userId_walkId: {
               userId,
-              walkName,
+              walkId,
             },
           },
         });
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       logger.error('Database operation failed', { 
         error: dbError, 
         operation: completed ? 'create' : 'delete',
-        walkName,
+        walkId,
         userId
       }, userId, 'walk:db_error');
       throw dbError;

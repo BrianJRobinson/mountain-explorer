@@ -9,28 +9,49 @@ import { useSession } from 'next-auth/react';
 import { ToggleButton } from './shared/ToggleButton';
 import { Navbar } from './Navbar';
 
+interface BaseReview {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: Date;
+  type: 'mountain' | 'walk';
+}
+
+interface MountainReview extends BaseReview {
+  type: 'mountain';
+  mountainId: number;
+  mountain: {
+    id: number;
+    ukHillsDbName: string;
+    Height: number;
+    ukHillsDbSection: string;
+  };
+}
+
+interface WalkReview extends BaseReview {
+  type: 'walk';
+  walkId: number;
+  walk: {
+    id: number;
+    name: string;
+    Distance_K: string;
+    Distance_M: string;
+  };
+}
+
+type Review = MountainReview | WalkReview;
+
 interface UserProfileProps {
   user: {
     id: string;
     name: string | null;
     avatar: string | null;
   };
-  comments: Array<{
-    id: string;
-    rating: number;
-    comment: string | null;
-    createdAt: Date;
-    mountain: {
-      id: number;
-      ukHillsDbName: string;
-      Height: number;
-      ukHillsDbSection: string;
-    };
-  }>;
+  reviews: Review[];
   isOwnProfile: boolean;
 }
 
-export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) {
+export function UserProfile({ user, reviews, isOwnProfile }: UserProfileProps) {
   const { data: session } = useSession();
   const [followStats, setFollowStats] = useState({
     followingCount: 0,
@@ -72,7 +93,6 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
     }));
 
     try {
-
       const response = await fetch('/api/follow', {
         method: 'POST',
         headers: {
@@ -162,7 +182,7 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
                 <div className="flex items-center gap-4 text-sm sm:text-base text-gray-400">
-                  <p>{comments.length} mountain {comments.length === 1 ? 'review' : 'reviews'}</p>
+                  <p>{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</p>
                 </div>
                 {!isLoading && (
                   <div className="flex items-center gap-4 text-sm sm:text-base text-gray-400">
@@ -175,55 +195,77 @@ export function UserProfile({ user, comments, isOwnProfile }: UserProfileProps) 
           </div>
         </div>
 
-        {/* Comments Grid */}
+        {/* Reviews Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {comments.map((comment, index) => (
+          {reviews.map((review, index) => (
             <div 
-              key={comment.id} 
+              key={review.id} 
               className="bg-gray-800 rounded-xl overflow-hidden shadow-lg border border-gray-700/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-orange-500/10 group animate-slide-in"
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              {/* Mountain Name Header */}
+              {/* Review Header */}
               <div className="bg-gray-700/50 p-4 border-b border-gray-700/50 transition-colors duration-300 group-hover:bg-gray-700/70">
-                <Link 
-                  href={`/?search=${encodeURIComponent(comment.mountain.ukHillsDbName)}#mountains`}
-                  className="text-xl font-semibold text-orange-400 hover:text-orange-300 transition-all duration-300 line-clamp-1 group-hover:scale-105 inline-block"
-                >
-                  {comment.mountain.ukHillsDbName}
-                </Link>
+                <div className="flex items-center gap-2">
+                  {review.type === 'mountain' ? (
+                    <svg className="w-10 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-10 h-5 text-green-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 20L3 17V4L9 7M9 20L15 17M9 20V7M15 17L21 20V7L15 4M15 17V4M9 7L15 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                  <Link 
+                    href={review.type === 'mountain' 
+                      ? `/?search=${encodeURIComponent(review.mountain.ukHillsDbName)}#mountains`
+                      : `/?search=${encodeURIComponent(review.walk.name)}#walks`}
+                    className="text-xl font-semibold text-orange-400 hover:text-orange-300 transition-all duration-300 line-clamp-1 group-hover:scale-105 inline-block"
+                  >
+                    {review.type === 'mountain' ? review.mountain.ukHillsDbName : review.walk.name}
+                  </Link>
+                </div>
                 <div className="flex items-center justify-between mt-2">
                   <div className="group">
                     <StarRating 
-                      rating={comment.rating} 
+                      rating={review.rating} 
                       size="sm"
                     />
                   </div>
                   <div className="text-sm text-gray-400 transition-colors group-hover:text-gray-300">
-                    {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
                   </div>
                 </div>
               </div>
               
-              {/* Comment Body */}
+              {/* Review Body */}
               <div className="p-4 transition-colors duration-300 group-hover:bg-gray-800/70">
                 <p className="text-gray-300 mb-4 min-h-[3rem] line-clamp-3 transition-colors group-hover:text-white">
-                  {comment.comment || 'No comment provided'}
+                  {review.comment || 'No comment provided'}
                 </p>
                 <div className="flex items-center justify-between text-sm text-gray-400 pt-2 border-t border-gray-700/50">
-                  <div className="transition-transform duration-300 group-hover:translate-x-1">Height: {comment.mountain.Height}m</div>
-                  <div className="transition-transform duration-300 group-hover:-translate-x-1">Region: {comment.mountain.ukHillsDbSection}</div>
+                  {review.type === 'mountain' ? (
+                    <>
+                      <div className="transition-transform duration-300 group-hover:translate-x-1">Height: {review.mountain.Height}m</div>
+                      <div className="transition-transform duration-300 group-hover:-translate-x-1">Region: {review.mountain.ukHillsDbSection}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="transition-transform duration-300 group-hover:translate-x-1">Distance: {review.walk.Distance_K}km</div>
+                      <div className="transition-transform duration-300 group-hover:-translate-x-1">{review.walk.Distance_M} miles</div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {comments.length === 0 && (
+        {reviews.length === 0 && (
           <div className="bg-gray-800 rounded-xl p-6 text-center shadow-lg border border-gray-700/50 animate-float">
             <p className="text-gray-400">
               {isOwnProfile 
-                ? "You haven't left any mountain reviews yet."
-                : "This user hasn't left any mountain reviews yet."}
+                ? "You haven't left any reviews yet."
+                : "This user hasn't left any reviews yet."}
             </p>
           </div>
         )}

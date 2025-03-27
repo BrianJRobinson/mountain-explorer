@@ -13,10 +13,9 @@ export async function GET() {
       });
     }
 
-    // Get all walk ratings with their averages
-    const walkRatings = await prisma.walkRating.groupBy({
-      by: ['walkName'],
-      _sum: {
+    const ratings = await prisma.walkRating.groupBy({
+      by: ['walkId'],
+      _avg: {
         rating: true,
       },
       _count: {
@@ -24,14 +23,13 @@ export async function GET() {
       },
     });
 
-    // Transform the data into a more usable format
-    const ratings = walkRatings.map(rating => ({
-      walkName: rating.walkName,
-      averageRating: rating._sum.rating ? rating._sum.rating / rating._count.rating : 0,
+    const formattedRatings = ratings.map(rating => ({
+      walkId: rating.walkId,
+      averageRating: rating._avg.rating || 0,
       totalRatings: rating._count.rating,
     }));
 
-    return NextResponse.json(ratings);
+    return NextResponse.json(formattedRatings);
   } catch (error) {
     console.error('Error fetching walk ratings:', error);
     return NextResponse.json(

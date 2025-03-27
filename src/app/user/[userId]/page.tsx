@@ -14,14 +14,34 @@ interface MountainDetails {
   ukHillsDbSection: string;
 }
 
-interface CommentWithMountain {
+interface WalkDetails {
+  id: number;
+  name: string;
+  Distance_K: string;
+  Distance_M: string;
+}
+
+interface BaseReview {
   id: string;
   rating: number;
   comment: string | null;
   createdAt: Date;
+  type: 'mountain' | 'walk';
+}
+
+interface MountainReview extends BaseReview {
+  type: 'mountain';
   mountainId: number;
   mountain: MountainDetails;
 }
+
+interface WalkReview extends BaseReview {
+  type: 'walk';
+  walkId: number;
+  walk: WalkDetails;
+}
+
+type Review = MountainReview | WalkReview;
 
 interface PageProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,7 +94,7 @@ export default async function Page({
   }
 
   // Fetch all mountain ratings and comments by this user
-  const userComments = await prisma.mountainRating.findMany({
+  const mountainComments = await prisma.mountainRating.findMany({
     where: {
       userId: userId,
       comment: {
@@ -93,38 +113,90 @@ export default async function Page({
     },
   });
 
-  // Load mountain data from JSON file
-  const dataDirectory = path.join(process.cwd(), 'public/data');
-  const fileContents = await fs.readFile(dataDirectory + '/data.json', 'utf8');
-  const data = JSON.parse(fileContents);
-  const mountains: MountainDetails[] = data.pageProps.mountains;
+  // Fetch all walk ratings and comments by this user
+  const walkComments = await prisma.walkRating.findMany({
+    where: {
+      userId: userId,
+      comment: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      rating: true,
+      comment: true,
+      createdAt: true,
+      walkId: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
 
-  // Create a map of mountain details
+  // Load mountain data from JSON file
+  const mountainDataDirectory = path.join(process.cwd(), 'public/data');
+  const mountainFileContents = await fs.readFile(mountainDataDirectory + '/data.json', 'utf8');
+  const mountainData = JSON.parse(mountainFileContents);
+  const mountains: MountainDetails[] = mountainData.pageProps.mountains;
+
+  // Load walk data from JSON file
+  const walkFileContents = await fs.readFile(mountainDataDirectory + '/Walks.json', 'utf8');
+  const walkData = JSON.parse(walkFileContents);
+  const walks: WalkDetails[] = walkData.Path_name;
+
+  // Create maps for quick lookups
   const mountainMap = new Map(
-    mountains.map(m => [m.id, m])
+    mountains.map(m => [m.id.toString(), m])
+  );
+  const walkMap = new Map(
+    walks.map(w => [w.id.toString(), w])
   );
 
-  // Combine the data
-  const commentsWithMountains = userComments.map(comment => {
-    const mountain = mountainMap.get(comment.mountainId);
+  // Combine mountain reviews with details
+  const mountainReviews: MountainReview[] = mountainComments.map(comment => {
+    const mountain = mountainMap.get(String(comment.mountainId));
     if (!mountain) {
       throw new Error(`Mountain not found for comment ${comment.id}`);
     }
     return {
       ...comment,
+      type: 'mountain',
       mountain: {
-        id: mountain.id,
+        id: parseInt(String(mountain.id)),
         ukHillsDbName: mountain.ukHillsDbName,
         Height: mountain.Height,
         ukHillsDbSection: mountain.ukHillsDbSection
       }
-    } as CommentWithMountain;
+    };
   });
+
+  // Combine walk reviews with details
+  const walkReviews: WalkReview[] = walkComments.map(comment => {
+    const walk = walkMap.get(String(comment.walkId));
+    if (!walk) {
+      throw new Error(`Walk not found for comment ${comment.id}`);
+    }
+    return {
+      ...comment,
+      type: 'walk',
+      walk: {
+        id: parseInt(String(walk.id)),
+        name: walk.name,
+        Distance_K: walk.Distance_K,
+        Distance_M: walk.Distance_M
+      }
+    };
+  });
+
+  // Combine and sort all reviews by date
+  const allReviews: Review[] = [...mountainReviews, ...walkReviews].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  );
 
   return (
     <UserProfile
       user={user}
-      comments={commentsWithMountains}
+      reviews={allReviews}
       isOwnProfile={session?.user?.id === user.id}
     />
   );

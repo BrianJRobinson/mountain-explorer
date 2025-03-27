@@ -16,13 +16,13 @@ export interface Comment {
 interface CommentsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  walkName: string;
+  walkId: number;
 }
 
 export const CommentsModal: React.FC<CommentsModalProps> = ({
   isOpen,
   onClose,
-  walkName,
+  walkId,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,9 +30,9 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       const fetchComments = async () => {
-        setIsLoading(true);
         try {
-          const response = await fetch(`/api/walks/comments?walkName=${encodeURIComponent(walkName)}`);
+          setIsLoading(true);
+          const response = await fetch(`/api/walks/comments?walkId=${walkId}`);
           if (!response.ok) throw new Error('Failed to fetch comments');
           const data = await response.json();
           setComments(data);
@@ -46,7 +46,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
 
       fetchComments();
     }
-  }, [isOpen, walkName]);
+  }, [isOpen, walkId]);
 
   if (!isOpen) return null;
 

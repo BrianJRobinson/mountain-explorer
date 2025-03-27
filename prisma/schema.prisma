@@ -56,24 +56,24 @@ model MountainRating {
 model WalkCompletion {
   id          String   @id @default(cuid())
   userId      String
-  walkName    String
+  walkId      Int
   completedAt DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
 
-  @@unique([userId, walkName])
+  @@unique([userId, walkId])
 }
 
 model WalkRating {
   id         String   @id @default(cuid())
   userId     String
-  walkName   String
+  walkId     Int
   rating     Float
   comment    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   user       User     @relation(fields: [userId], references: [id])
 
-  @@unique([userId, walkName])
+  @@unique([userId, walkId])
 }
 
 model Follow {
@@ -96,7 +96,8 @@ model Notification {
   createdAt   DateTime @default(now())
   senderId    String
   recipientId String
-  mountainId  Int?     // Optional, only for mountain-related notifications
+  datasetId   Int      // 1 for mountains, 2 for walks, 99 for follows
+  activityId  Int?     // Optional, renamed from mountainId to be more generic
   sender      User     @relation("NotificationSender", fields: [senderId], references: [id])
   recipient   User     @relation("NotificationRecipient", fields: [recipientId], references: [id])
 

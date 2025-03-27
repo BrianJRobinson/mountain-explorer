@@ -1,3 +1,10 @@
+/**
+ * ⚠️ CRITICAL FILE - DO NOT MODIFY:
+ * - Avatar handling
+ * - User session fields
+ * - Authentication logic
+ */
+
 import { Navbar } from '@/components/Navbar';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
@@ -21,12 +28,12 @@ export default async function HomePage() {
         }}
       >
         <div className="text-center text-white z-10 px-4 max-w-4xl mx-auto">
-          {session?.user?.image && (
+          {session?.user && (
             <>
               <div className="flex justify-center mb-4">
                 <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-orange-500 shadow-lg">
                   <Image
-                    src={session.user.image}
+                    src={`/avatars/${session.user.avatar === "default" ? 'Avatar1.webp' : session.user.avatar || 'Avatar1.webp'}`}
                     alt={session.user.name || 'User avatar'}
                     fill
                     style={{ objectFit: 'cover' }}
