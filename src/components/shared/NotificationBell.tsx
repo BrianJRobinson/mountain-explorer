@@ -29,12 +29,23 @@ export function NotificationBell() {
     const fetchNotifications = async () => {
       try {
         const response = await fetch('/api/notifications');
+        if (!response.ok) {
+          console.error('Failed to fetch notifications:', response.statusText);
+          setNotifications([]);
+          setUnreadCount(0);
+          return;
+        }
         const data = await response.json();
+        // Handle case where data.notifications might be undefined or null
+        const validNotifications = data.notifications || [];
         // Only keep unread notifications
-        setNotifications(data.notifications.filter((n: Notification) => !n.isRead));
-        setUnreadCount(data.unreadCount);
+        setNotifications(validNotifications.filter((n: Notification) => !n.isRead));
+        setUnreadCount(data.unreadCount || 0);
       } catch (error) {
         console.error('Error fetching notifications:', error);
+        // Set empty state on error
+        setNotifications([]);
+        setUnreadCount(0);
       }
     };
 
@@ -59,13 +70,17 @@ export function NotificationBell() {
 
   const handleNotificationClick = async (notificationId: string) => {
     try {
-      await fetch('/api/notifications', {
+      const response = await fetch('/api/notifications', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ notificationIds: [notificationId] }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to mark notification as read');
+      }
 
       // Mark as read and trigger animation
       setReadNotifications(prev => new Set([...prev, notificationId]));
