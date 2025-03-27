@@ -10,10 +10,10 @@ import { Mountain } from '@/app/types/Mountain';
 interface RawMountain {
   id: number;
   ukHillsDbName: string;
-  Height: number;
+  ukHillsDbSection: string;
   ukHillsDbLatitude: string;
   ukHillsDbLongitude: string;
-  ukHillsDbSection: string;
+  Height: number;
   MountainCategoryID: number;
   urlName: string;
 }
@@ -21,7 +21,7 @@ interface RawMountain {
 async function getData() {
   const session = await getServerSession(authOptions);
   const dataDirectory = path.join(process.cwd(), 'public/data');
-  const fileContents = await fs.readFile(dataDirectory + '/data.json', 'utf8');
+  const fileContents = await fs.readFile(dataDirectory + '/Mountains.json', 'utf8');
   const data = JSON.parse(fileContents);
   const mountains: RawMountain[] = data.pageProps.mountains;
 
@@ -58,9 +58,8 @@ async function getData() {
     ])
   );
 
-  // If user is logged in, fetch their ratings and recent comments
+  // If user is logged in, fetch their ratings
   let userRatings = new Map();
-  const recentComments = new Map();
   
   if (session?.user?.id) {
     // Fetch user's ratings
@@ -84,49 +83,6 @@ async function getData() {
         },
       ])
     );
-
-    // Fetch recent comments for all mountains
-    const recentCommentsData = await prisma.mountainRating.findMany({
-      where: {
-        comment: {
-          not: null,
-        },
-      },
-      select: {
-        mountainId: true,
-        rating: true,
-        comment: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    // Group comments by mountainId and take the 5 most recent
-    recentCommentsData.forEach(comment => {
-      if (!recentComments.has(comment.mountainId)) {
-        recentComments.set(comment.mountainId, []);
-      }
-      const comments = recentComments.get(comment.mountainId);
-      if (comments.length < 5) {
-        comments.push({
-          rating: comment.rating,
-          comment: comment.comment || null,
-          createdAt: comment.createdAt.toISOString(),
-          userName: comment.user.name || null,
-          userAvatar: comment.user.avatar || null,
-          userId: comment.user.id
-        });
-      }
-    });
   }
 
   // Add rating data to each mountain
@@ -136,7 +92,6 @@ async function getData() {
     ...(session?.user?.id && {
       userRating: userRatings.get(mountain.id)?.rating,
       userComment: userRatings.get(mountain.id)?.comment || null,
-      recentComments: recentComments.get(mountain.id) || [],
     }),
   }));
 }
