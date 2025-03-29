@@ -101,12 +101,21 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt'
   },
   callbacks: {
-    jwt: async ({ token, user }) => {
+    jwt: async ({ token, user, trigger, session }) => {
       if (user) {
+        // Initial sign in
         token.id = user.id;
         token.avatar = user.avatar;
         token.picture = user.avatar ? `/avatars/${user.avatar}` : '/avatars/Avatar1.webp';
       }
+
+      // Handle updates to the session
+      if (trigger === "update" && session) {
+        token.avatar = session.avatar;
+        token.picture = session.avatar ? `/avatars/${session.avatar}` : '/avatars/Avatar1.webp';
+        token.name = session.name;
+      }
+
       return token;
     },
     session: async ({ session, token }) => {

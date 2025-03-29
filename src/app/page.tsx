@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './api/auth/auth-options';
 import Image from 'next/image';
+import { HeroAvatar } from '@/components/HeroAvatar';
 
 export default async function HomePage() {
   const session = await getServerSession(authOptions);
@@ -20,6 +21,7 @@ export default async function HomePage() {
       
       {/* Hero Section */}
       <section 
+        className="relative min-h-screen flex items-center justify-center pt-16 md:pt-0"
         style={{
           backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("/mountain-hero.jpg")',
           backgroundSize: 'cover',
@@ -27,23 +29,7 @@ export default async function HomePage() {
         }}
       >
         <div className="text-center text-white z-10 px-4 max-w-4xl mx-auto">
-          {session?.user && (
-            <>
-              <div className="flex justify-center mb-4">
-                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-orange-500 shadow-lg">
-                  <Image
-                    src={`/avatars/${session.user.avatar === "default" ? 'Avatar1.webp' : session.user.avatar || 'Avatar1.webp'}`}
-                    alt={session.user.name || 'User avatar'}
-                    fill
-                    style={{ objectFit: 'cover' }}
-                  />
-                </div>
-              </div>
-              <h2 className="text-2xl font-semibold mb-8">
-                Welcome, {session.user.name}
-              </h2>
-            </>
-          )}
+          <HeroAvatar />
           <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6">
             Explore The UK&apos;s Natural Beauty
           </h1>

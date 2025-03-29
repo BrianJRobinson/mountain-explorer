@@ -16,7 +16,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const [userName, setUserName] = useState<string>('');
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,18 +28,20 @@ export function UserProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    console.log('Session status:', status);
-    console.log('Session data:', session);
-    console.log('User data:', session?.user);
-    console.log('Avatar from session:', session?.user?.avatar);
+    console.log('🔄 Session state changed:', {
+      status,
+      avatar: session?.user?.avatar,
+      image: session?.user?.image,
+      timestamp: new Date().toISOString()
+    });
 
     if (session?.user) {
       setUserName(session.user.name || '');
       if (session.user.avatar) {
-        console.log('Setting avatar to:', session.user.avatar);
+        console.log('📗 Setting avatar to:', session.user.avatar);
         setUserAvatar(session.user.avatar);
       } else {
-        console.log('No avatar in session, using default');
+        console.log('📕 No avatar in session, using default');
         setUserAvatar('default');
       }
     } else {
@@ -51,6 +53,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   const updateUserProfile = async (name: string, avatar: string) => {
     try {
+      console.log('📝 Starting profile update:', { name, avatar });
       const response = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: {
@@ -67,8 +70,18 @@ export function UserProvider({ children }: { children: ReactNode }) {
       }
 
       const updatedUser = await response.json();
-      setUserName(updatedUser.name);
-      setUserAvatar(updatedUser.avatar);
+      console.log('✅ Profile API update successful:', updatedUser);
+      console.log('👤 Session state before update:', {
+        before: session?.user,
+        timestamp: new Date().toISOString()
+      });
+
+      await update({
+        name: updatedUser.name,
+        avatar: updatedUser.avatar,
+      });
+
+      console.log('🔵 Session update completed');
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
