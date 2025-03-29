@@ -20,7 +20,6 @@ export default async function HomePage() {
       
       {/* Hero Section */}
       <section 
-        className="relative min-h-screen flex items-center justify-center"
         style={{
           backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url("/mountain-hero.jpg")',
           backgroundSize: 'cover',
