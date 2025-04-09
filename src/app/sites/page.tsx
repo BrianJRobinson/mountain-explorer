@@ -86,10 +86,19 @@ export default async function SitesPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900 overflow-x-hidden">
       <Navbar />
-      <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-white mb-8">Historical Sites</h1>
+      <section className="relative pt-20 pb-10 px-4">
+        <div className="text-center max-w-4xl mx-auto">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 text-white">
+            Explore Historical Sites
+          </h1>
+          <p className="text-lg md:text-xl text-gray-300 mb-8">
+            Discover fascinating historical locations across the UK.
+          </p>
+        </div>
+      </section>
+      <main className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
         <SitesDirectory sites={sitesWithRatings} />
       </main>
     </div>

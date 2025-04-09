@@ -292,6 +292,59 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
 
   return (
     <div className="p-4 md:p-8">
+      {/* ===== INSERTED STICKY HEADER ===== */}
+      <div className="sticky top-16 z-40 bg-gray-900/95 backdrop-blur-sm py-4 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-wrap gap-2 p-2 w-full md:w-auto bg-gray-900 rounded-xl shadow-inner">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                // Use existing state setter
+                setShowCompletedOnly(prev => prev === null ? true : !prev);
+              }}
+              className={`px-6 py-2 rounded-lg transition-all duration-200 ${
+                // Use existing state variable
+                showCompletedOnly
+                  ? 'bg-orange-500 text-white shadow-lg'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 shadow-inner border border-gray-700'
+              }`}
+            >
+              {/* Use existing state variable */}
+              Completed ({completedSites.length})
+            </button>            
+          </div>
+          <div className="w-full md:w-auto relative">
+            <input
+              type="text"
+              // Update placeholder
+              placeholder="Search sites..."
+              // Use existing state variable
+              value={searchQuery}
+              // Use existing state setter
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full md:w-64 pl-4 pr-10 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent shadow-inner"
+            />
+            {/* Use existing state variable */}
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  // Use existing state setter
+                  setSearchQuery('');
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                aria-label="Clear search"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      {/* ===== END INSERTED STICKY HEADER ===== */}
+
       {/* Filter Section - Keep or remove based on whether filter UI is intended */}
       {/* <SitesFilter 
         onTypeChange={setSelectedTypes} 
@@ -301,11 +354,20 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
       /> */}
       
       {/* Status Message */}
-      {(status === 'loading' || isLoadingCompletions) && <p className="text-center text-gray-400">Loading...</p>}
       {status === 'unauthenticated' && !isLoadingCompletions && <p className="text-center text-gray-400">Sign in to track completed sites and ratings.</p>}
 
       {/* Grid Container */}
-      <div ref={parentRef} className="w-full overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
+      <div 
+        ref={parentRef} 
+        className="w-full overflow-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-orange-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-orange-500/70" 
+        style={{ 
+          height: 'calc(100vh - 200px)',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(249, 115, 22, 0.5) rgb(31, 41, 55)',
+          paddingRight: `${ROW_GAP}px`
+        }}
+      >
         <div
           style={{
             height: `${rowVirtualizer.getTotalSize()}px`,
@@ -324,17 +386,23 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
             for (let i = firstItemIndex; i < lastItemIndex; i++) {
               const site = filteredSites[i];
               rowItems.push(
-                <div key={site.id} style={{ width: `${100 / columnCount}%` }}>
+                <div 
+                  key={site.id} 
+                  style={{ 
+                    width: `calc((100% - (${ROW_GAP}px * ${columnCount - 1})) / ${columnCount})` 
+                  }}
+                >
                   <SitesCard
                     site={site}
                     isCompleted={completedSites.includes(site.id)}
                     onToggleCompletion={(siteId, completed) => handleToggleCompletion(siteId, completed)}
-                    allSites={sites}
+                    allSites={filteredSites}
                     onMapMarkerClick={handleMapMarkerClick}
                     onSubmitRating={handleSubmitRating}
                     hasComments={sitesWithComments[site.id] > 0}
                     commentCount={sitesWithComments[site.id] || 0}
                     onCommentAdded={() => updateSiteCommentCount(site.id, true)}
+                    isInitialLoading={status === 'loading' || isLoadingCompletions}
                   />
                 </div>
               );

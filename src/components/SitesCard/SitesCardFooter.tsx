@@ -5,6 +5,7 @@ interface SitesCardFooterProps {
   rating?: number;
   totalRatings?: number;
   hasRecentComments: boolean;
+  commentCount: number;
   isUserLoggedIn: boolean;
   hasUserRated: boolean;
   onShowComments: () => void;
@@ -15,6 +16,7 @@ export const SitesCardFooter: React.FC<SitesCardFooterProps> = ({
   rating,
   totalRatings,
   hasRecentComments,
+  commentCount,
   isUserLoggedIn,
   hasUserRated,
   onShowComments,
@@ -49,7 +51,7 @@ export const SitesCardFooter: React.FC<SitesCardFooterProps> = ({
               </svg>
               <div className="absolute bottom-full right-0 transform -translate-y-2 pointer-events-none opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200">
                 <div className="px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap border border-gray-800">
-                  View Comments
+                  {commentCount} {commentCount === 1 ? 'Comment' : 'Comments'}
                   <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900 border-r border-b border-gray-800"></div>
                 </div>
               </div>

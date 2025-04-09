@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { Site } from '@/app/types/Sites';
 import { toast } from 'react-hot-toast';
@@ -18,7 +18,7 @@ interface SitesCardProps {
   isCompleted?: boolean;
   onToggleCompletion: (siteId: number, completed: boolean) => Promise<void>;
   isInitialLoading?: boolean;
-  allSites: Site[];
+  allSites?: Site[];
   onMapMarkerClick?: (siteName: string) => void;
   onSubmitRating: (siteId: number, rating: number, comment: string) => Promise<Site>;
   hasComments: boolean;
@@ -239,7 +239,7 @@ export const SitesCard: React.FC<SitesCardProps> = ({
       <SitesMap 
         isOpen={showMap}
         site={site}
-        allSites={allSites}
+        allSites={allSites || []}
         onSiteSelect={handleSiteSelectFromMap}
         onClose={handleCloseMap}
       />

@@ -50,6 +50,13 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
     }
   }, [isOpen, siteId]);
 
+  // Notify parent when comments change
+  useEffect(() => {
+    if (comments.length > 0 && onCommentAdded) {
+      onCommentAdded();
+    }
+  }, [comments, onCommentAdded]);
+
   if (!isOpen) return null;
 
   return (
@@ -75,7 +82,11 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
             comments.map((comment, index) => (
               <div key={index} className="text-sm flex gap-3">
                 <div className="flex-shrink-0">
-                  <Link href={`/user/${comment.userId}`} className="block">
+                  <Link 
+                    href={`/user/${comment.userId}`} 
+                    className="block"
+                    onClick={onClose}
+                  >
                     <div className="w-8 h-8 rounded-full overflow-hidden relative hover:ring-2 hover:ring-orange-500 transition-all">
                       <Image
                         src={`/avatars/${comment.userAvatar === "default" ? 'Avatar1.webp' : comment.userAvatar || 'Avatar1.webp'}`}
@@ -92,6 +103,7 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
                     <Link 
                       href={`/user/${comment.userId}`}
                       className="text-orange-400 font-medium hover:text-orange-300 transition-colors"
+                      onClick={onClose}
                     >
                       {comment.userName || 'Anonymous'}
                     </Link>
