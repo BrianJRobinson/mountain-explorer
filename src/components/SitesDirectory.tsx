@@ -5,7 +5,6 @@ import { SitesCard } from './SitesCard';
 import { useSession } from 'next-auth/react';
 import { Site } from '@/app/types/Sites';
 import { toast } from 'react-hot-toast';
-import { SitesFilter } from './sites/SitesFilter';
 
 interface SitesDirectoryProps {
   sites: Site[];
@@ -17,16 +16,13 @@ interface SiteCompletion {
 
 export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
   const { data: session, status } = useSession();
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showCompletedOnly, setShowCompletedOnly] = useState<boolean | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [completedSites, setCompletedSites] = useState<number[]>([]);
   const [isLoadingCompletions, setIsLoadingCompletions] = useState(true);
-  const [columnCount, setColumnCount] = useState(4); // Default to 5 columns
-  const [siteRatings, setSiteRatings] = useState<Record<number, { rating: number; comment: string; averageRating: number; totalRatings: number }>>({});
+  const [columnCount, setColumnCount] = useState(4);
+  const [sitesWithComments, setSitesWithComments] = useState<Record<number, number>>({});
   const parentRef = useRef<HTMLDivElement>(null);
-
 
   // Initialize search from URL parameter
   useEffect(() => {
@@ -35,7 +31,6 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
       const searchParam = params.get('search');
       if (searchParam) {
         setSearchQuery(searchParam);
-        setDebouncedSearch(searchParam);
       }
     }
   }, []);
@@ -44,7 +39,72 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
   const IMAGE_HEIGHT = 152; // h-38
   const CONTENT_HEIGHT = 240; // Content section height
   const CARD_HEIGHT = IMAGE_HEIGHT + CONTENT_HEIGHT;
-  const ROW_GAP = 8; // gap-4 instead of gap-6
+  const ROW_GAP = 8; // gap-4
+
+  // Add this function to update a single site's comment count
+  const updateSiteCommentCount = useCallback((siteId: number, increment: boolean = true) => {
+    setSitesWithComments(prev => {
+      const newCounts = { ...prev };
+      if (increment) {
+        newCounts[siteId] = (newCounts[siteId] || 0) + 1;
+      } else {
+        // If decrementing and count would go to 0, remove the entry
+        if (newCounts[siteId] && newCounts[siteId] > 1) {
+          newCounts[siteId] = newCounts[siteId] - 1;
+        } else {
+          delete newCounts[siteId];
+        }
+      }
+      return newCounts;
+    });
+  }, []);
+
+  // Improve the fetchCommentCounts function with retry logic
+  const fetchCommentCounts = useCallback(async (retryCount = 0) => {
+    try {
+      const response = await fetch('/api/sites/comments/counts');
+      if (!response.ok) throw new Error('Failed to fetch comment counts');
+      const data = await response.json();
+      setSitesWithComments(data);
+    } catch (error) {
+      console.error('Error fetching comment counts:', error);
+      
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+        setTimeout(() => fetchCommentCounts(retryCount + 1), delay);
+      }
+    }
+  }, []);
+
+  // Initial fetch of comment counts
+  useEffect(() => {
+    fetchCommentCounts();
+  }, [fetchCommentCounts]);
+
+  // Improve the polling mechanism with better error handling
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    
+    const startPolling = () => {
+      // Initial fetch
+      fetchCommentCounts();
+      
+      // Set up polling
+      pollInterval = setInterval(() => {
+        fetchCommentCounts();
+      }, 60000); // Poll every minute
+    };
+    
+    startPolling();
+    
+    // Clean up on unmount
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [fetchCommentCounts]);
 
   const fetchCompletedSites = useCallback(async () => {
     try {
@@ -53,19 +113,14 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
         setIsLoadingCompletions(false);
         return;
       }
-
       setIsLoadingCompletions(true);
-      
       const response = await fetch('/api/sites/completed', {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
       });
-      
       if (response.ok) {
-        const data = await response.json();
+        const data: SiteCompletion[] = await response.json();
         setCompletedSites(data.map((completion: SiteCompletion) => completion.siteId));
       } else {
         const errorData = await response.json();
@@ -89,11 +144,12 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
     }
   }, [session, status, fetchCompletedSites]);
 
+  // Debounce search query directly in this effect
+  const [effectiveSearchQuery, setEffectiveSearchQuery] = useState('');
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
+      setEffectiveSearchQuery(searchQuery);
     }, 500);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
@@ -101,12 +157,11 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
   useEffect(() => {
     const updateColumnCount = () => {
       const width = window.innerWidth;
-      if (width < 768) setColumnCount(1); // mobile
-      else if (width < 1024) setColumnCount(2); // tablet
-      else if (width < 1280) setColumnCount(3); // laptop
-      else setColumnCount(4); // desktop
+      if (width < 768) setColumnCount(1);
+      else if (width < 1024) setColumnCount(2);
+      else if (width < 1280) setColumnCount(3);
+      else setColumnCount(4);
     };
-
     updateColumnCount();
     window.addEventListener('resize', updateColumnCount);
     return () => window.removeEventListener('resize', updateColumnCount);
@@ -114,271 +169,176 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
 
   const handleToggleCompletion = async (siteId: number, completed: boolean) => {
     try {
-      console.log('[SitesDirectory] Starting toggle completion:', {
-        siteId,
-        completed,
-        currentCompletedSites: completedSites
-      });
-
-      // Optimistically update the UI
+      console.log('[SitesDirectory] Starting toggle completion:', { siteId, completed, currentCompletedSites: completedSites });
       setCompletedSites(prev => {
-        const newState = completed 
-          ? [...prev, siteId]
-          : prev.filter(id => id !== siteId);
-        console.log('[SitesDirectory] Updated completedSites state:', {
-          siteId,
-          completed,
-          previousState: prev,
-          newState
-        });
+        const newState = completed ? [...prev, siteId] : prev.filter(id => id !== siteId);
+        console.log('[SitesDirectory] Updated completedSites state:', { siteId, completed, previousState: prev, newState });
         return newState;
       });
-
       const response = await fetch('/api/sites/toggle-completion', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          siteId, 
-          completed,
-          userId: session?.user?.id 
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, completed, userId: session?.user?.id }),
       });
-
       if (!response.ok) {
         console.log('[SitesDirectory] API call failed, reverting state');
-        // Revert the optimistic update on error
         setCompletedSites(prev => {
-          const revertedState = completed 
-            ? prev.filter(id => id !== siteId)
-            : [...prev, siteId];
-          console.log('[SitesDirectory] Reverted completedSites state:', {
-            siteId,
-            completed,
-            previousState: prev,
-            revertedState
-          });
+          const revertedState = completed ? prev.filter(id => id !== siteId) : [...prev, siteId];
+          console.log('[SitesDirectory] Reverted completedSites state:', { siteId, completed, previousState: prev, revertedState });
           return revertedState;
         });
         throw new Error('Failed to update completion status');
       }
-
-      console.log('[SitesDirectory] Toggle completion successful:', {
-        siteId,
-        completed,
-        currentCompletedSites: completedSites
-      });
-
-      // Show success toast
-      toast.success(
-        completed ? 'Site marked as completed!' : 'Site marked as not completed',
-        { duration: 2000 }
-      );
-
+      console.log('[SitesDirectory] Toggle completion successful:', { siteId, completed, currentCompletedSites: completedSites });
+      toast.success(completed ? 'Site marked as completed!' : 'Site marked as not completed', { duration: 2000 });
     } catch (error) {
       console.error('[SitesDirectory] Error in handleToggleCompletion:', error);
-      toast.error('Failed to update completion status. Please try again.', {
-        duration: 3000,
-      });
-      
+      toast.error('Failed to update completion status. Please try again.', { duration: 3000 });
       throw error;
     }
   };
 
   const handleMapMarkerClick = (siteName: string) => {
     setSearchQuery(siteName);
-    setDebouncedSearch(siteName);
   };
 
-  const handleSubmitRating = async (siteId: number, rating: number, comment: string) => {
+  const handleSubmitRating = async (siteId: number, rating: number, comment: string): Promise<Site> => {
     try {
-      console.log('[SitesDirectory] Starting rating submission:', { 
-        siteId, 
-        rating, 
-        comment,
-        isCompleted: completedSites.includes(siteId)
-      });
+      console.log('[SitesDirectory] Starting rating submission:', { siteId, rating, comment, isCompleted: completedSites.includes(siteId) });
+      
+      // Optimistically update comment count if a comment is provided
+      if (comment.trim()) {
+        updateSiteCommentCount(siteId, true);
+      }
       
       const response = await fetch('/api/sites/rate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          siteId,
-          rating,
-          comment: comment.trim() || null
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteId, rating, comment: comment.trim() || null }),
       });
-
       if (!response.ok) {
+        // Revert optimistic update on error
+        if (comment.trim()) {
+          updateSiteCommentCount(siteId, false);
+        }
+        
         const data = await response.json();
         throw new Error(data.error || 'Failed to submit rating');
       }
-      
-      // Get the updated sites data
-      const updatedRating = await response.json();
-      console.log('[SitesDirectory] Rating submission successful:', {
-        siteId,
-        updatedRating,
-        isCompleted: completedSites.includes(siteId)
-      });
-
-      // Update completion state since rating automatically completes the site
+      const updatedRatingData = await response.json();
+      console.log('[SitesDirectory] Rating submission successful:', { siteId, updatedRating: updatedRatingData, isCompleted: completedSites.includes(siteId) });
       if (!completedSites.includes(siteId)) {
         setCompletedSites(prev => [...prev, siteId]);
       }
-
-      // Return the mountain with updated rating values
-      const returnData = {
-        ...updatedRating,
-        averageRating: rating,
-        totalRatings: 1,
-        userRating: rating
+      
+      // Refresh comment counts to ensure we have the latest data
+      // This is a fallback in case the optimistic update missed something
+      fetchCommentCounts();
+      
+      const originalSite = sites.find(s => s.id === siteId);
+      if (!originalSite) {
+          console.error(`Site with ID ${siteId} not found in original list.`);
+          throw new Error(`Site data inconsistency for ID ${siteId}`);
+      }
+      const returnData: Site = {
+        ...originalSite,
+        userRating: rating,
+        userComment: comment.trim() || undefined,
+        averageRating: updatedRatingData.averageRating, 
+        totalRatings: updatedRatingData.totalRatings,
       };
-
       console.log('[SitesDirectory] Returning data:', returnData);
       return returnData;
-
     } catch (error) {
       console.error('[SitesDirectory] Error in handleSubmitRating:', error);
       throw error;
     }
   };
 
-  // Fetch user ratings for sites
-  const fetchUserRatings = useCallback(async () => {
-    if (!session?.user?.id) return;
+  // Filtered and sorted sites logic
+  const filteredSites = React.useMemo(() => {
+    let tempSites = [...sites];
 
-    try {
-      const response = await fetch('/api/sites/user-ratings', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
+    if (showCompletedOnly !== null) {
+      tempSites = tempSites.filter(site => {
+        const isCompleted = completedSites.includes(site.id);
+        return showCompletedOnly === isCompleted;
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const ratingsMap = data.reduce((acc: Record<number, any>, rating: any) => {
-          acc[rating.siteId] = {
-            rating: rating.rating,
-            comment: rating.comment,
-            averageRating: rating.averageRating,
-            totalRatings: rating.totalRatings
-          };
-          return acc;
-        }, {});
-        setSiteRatings(ratingsMap);
-      }
-    } catch (error) {
-      console.error('Error fetching user ratings:', error);
     }
-  }, [session?.user?.id]);
 
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
-      fetchUserRatings();
+    if (effectiveSearchQuery) {
+      const lowerCaseQuery = effectiveSearchQuery.toLowerCase();
+      tempSites = tempSites.filter(site =>
+        site.name.toLowerCase().includes(lowerCaseQuery) ||
+        site.kinds.toLowerCase().includes(lowerCaseQuery)
+      );
     }
-  }, [session, status, fetchUserRatings]);
 
-  // Filter sites
-  const filteredSites = sites; 
-  console.log(filteredSites);
-  /*const filteredSites = sites.features.filter(feature => {
-    const matchesTypes = selectedTypes.length === 0 || 
-      selectedTypes.some(type => feature.kinds.includes(type));
-    const matchesSearch = feature.name.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesCompleted = showCompletedOnly === false || showCompletedOnly === null || completedSites.includes(feature.id);
-    return matchesTypes && matchesSearch && matchesCompleted;
-  });
-*/
-  // Calculate rows needed based on number of items and columns
-  const rowCount = Math.ceil(filteredSites.length / columnCount);
+    return tempSites;
+  }, [
+    sites, 
+    showCompletedOnly, 
+    completedSites, 
+    effectiveSearchQuery
+  ]);
 
-  const virtualizer = useVirtualizer({
-    count: rowCount,
+  // Virtualizer setup
+  const rowVirtualizer = useVirtualizer({
+    count: Math.ceil(filteredSites.length / columnCount),
     getScrollElement: () => parentRef.current,
     estimateSize: () => CARD_HEIGHT + ROW_GAP,
     overscan: 5,
   });
 
-  const totalHeight = virtualizer.getTotalSize();
-
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen" id="sites">
-      <div className="sticky top-16 z-40 bg-gray-900/95 backdrop-blur-sm py-4 mb-8">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex flex-wrap gap-2 p-2 w-full md:w-auto bg-gray-900 rounded-xl shadow-inner">
-            {/*<SitesFilter
-              allTypes={allTypes}
-              selectedTypes={selectedTypes}
-              onTypeChange={setSelectedTypes}
-              siteCounts={siteCounts}
-            />*/}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setShowCompletedOnly(!showCompletedOnly);
-              }}
-              className={`px-6 py-2 rounded-lg transition-all duration-200 ${
-                showCompletedOnly
-                  ? 'bg-orange-500 text-white shadow-lg'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 shadow-inner border border-gray-700'
-              }`}
-            >
-              Completed ({completedSites.length})
-            </button>            
-          </div>
-          <div className="w-full md:w-auto relative">
-            <input
-              type="text"
-              placeholder="Search sites..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full md:w-64 pl-4 pr-10 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent shadow-inner"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setDebouncedSearch('');
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                aria-label="Clear search"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="p-4 md:p-8">
+      {/* Filter Section - Keep or remove based on whether filter UI is intended */}
+      {/* <SitesFilter 
+        onTypeChange={setSelectedTypes} 
+        onCompletionChange={setShowCompletedOnly} 
+        onSearchChange={setSearchQuery}
+        initialSearch={searchQuery}
+      /> */}
+      
+      {/* Status Message */}
+      {(status === 'loading' || isLoadingCompletions) && <p className="text-center text-gray-400">Loading...</p>}
+      {status === 'unauthenticated' && !isLoadingCompletions && <p className="text-center text-gray-400">Sign in to track completed sites and ratings.</p>}
 
-      <div 
-        ref={parentRef}
-        className="h-[800px] overflow-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-orange-500/50 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-orange-500/70"
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(249, 115, 22, 0.5) rgb(31, 41, 55)'
-        }}
-      >
+      {/* Grid Container */}
+      <div ref={parentRef} className="w-full overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
         <div
           style={{
-            height: `${totalHeight}px`,
+            height: `${rowVirtualizer.getTotalSize()}px`,
             width: '100%',
             position: 'relative',
           }}
         >
-          {virtualizer.getVirtualItems().map((virtualRow) => {
-            console.log(filteredSites);
-            const startIndex = virtualRow.index * columnCount;
-            const rowSites = filteredSites.slice(startIndex, startIndex + columnCount);
+          {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+            const rowItems = [];
+            const firstItemIndex = virtualRow.index * columnCount;
+            const lastItemIndex = Math.min(
+              firstItemIndex + columnCount,
+              filteredSites.length
+            );
+
+            for (let i = firstItemIndex; i < lastItemIndex; i++) {
+              const site = filteredSites[i];
+              rowItems.push(
+                <div key={site.id} style={{ width: `${100 / columnCount}%` }}>
+                  <SitesCard
+                    site={site}
+                    isCompleted={completedSites.includes(site.id)}
+                    onToggleCompletion={(siteId, completed) => handleToggleCompletion(siteId, completed)}
+                    allSites={sites}
+                    onMapMarkerClick={handleMapMarkerClick}
+                    onSubmitRating={handleSubmitRating}
+                    hasComments={sitesWithComments[site.id] > 0}
+                    commentCount={sitesWithComments[site.id] || 0}
+                    onCommentAdded={() => updateSiteCommentCount(site.id, true)}
+                  />
+                </div>
+              );
+            }
 
             return (
               <div
@@ -390,30 +350,20 @@ export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
                   width: '100%',
                   height: `${virtualRow.size}px`,
                   transform: `translateY(${virtualRow.start}px)`,
+                  display: 'flex',
+                  gap: `${ROW_GAP}px`, 
+                  paddingBottom: `${ROW_GAP}px`,
                 }}
               >
-                <div 
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
-                  style={{ height: CARD_HEIGHT }}
-                >
-                  {rowSites.map((site) => (
-                    <SitesCard
-                      key={site.id}
-                      site={site}
-                      isCompleted={completedSites.includes(site.id)}
-                      onToggleCompletion={handleToggleCompletion}
-                      isInitialLoading={status === 'authenticated' && isLoadingCompletions}
-                      allSites={sites}
-                      onMapMarkerClick={handleMapMarkerClick}
-                      onSubmitRating={handleSubmitRating}
-                    />
-                  ))}
-                </div>
+                {rowItems}
               </div>
             );
           })}
         </div>
       </div>
+      {filteredSites.length === 0 && status !== 'loading' && !isLoadingCompletions && (
+        <p className="text-center text-gray-500 mt-8">No sites match your current filters.</p>
+      )}
     </div>
   );
 }; 

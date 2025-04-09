@@ -22,6 +22,7 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
   const [completedWalks, setCompletedWalks] = useState<number[]>([]);
   const [isLoadingCompletions, setIsLoadingCompletions] = useState(true);
   const [columnCount, setColumnCount] = useState(4); // Default to 5 columns
+  const [walksWithComments, setWalksWithComments] = useState<Record<number, number>>({});
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Initialize search from URL parameter
@@ -108,6 +109,71 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
     return () => window.removeEventListener('resize', updateColumnCount);
   }, []);
 
+  // Add this function to update a single walk's comment count
+  const updateWalkCommentCount = useCallback((walkId: number, increment: boolean = true) => {
+    setWalksWithComments(prev => {
+      const newCounts = { ...prev };
+      if (increment) {
+        newCounts[walkId] = (newCounts[walkId] || 0) + 1;
+      } else {
+        // If decrementing and count would go to 0, remove the entry
+        if (newCounts[walkId] && newCounts[walkId] > 1) {
+          newCounts[walkId] = newCounts[walkId] - 1;
+        } else {
+          delete newCounts[walkId];
+        }
+      }
+      return newCounts;
+    });
+  }, []);
+
+  // Improve the fetchCommentCounts function with retry logic
+  const fetchCommentCounts = useCallback(async (retryCount = 0) => {
+    try {
+      const response = await fetch('/api/walks/comments/counts');
+      if (!response.ok) throw new Error('Failed to fetch comment counts');
+      const data = await response.json();
+      setWalksWithComments(data);
+    } catch (error) {
+      console.error('Error fetching comment counts:', error);
+      
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+        setTimeout(() => fetchCommentCounts(retryCount + 1), delay);
+      }
+    }
+  }, []);
+
+  // Initial fetch of comment counts
+  useEffect(() => {
+    fetchCommentCounts();
+  }, [fetchCommentCounts]);
+
+  // Improve the polling mechanism with better error handling
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    
+    const startPolling = () => {
+      // Initial fetch
+      fetchCommentCounts();
+      
+      // Set up polling
+      pollInterval = setInterval(() => {
+        fetchCommentCounts();
+      }, 60000); // Poll every minute
+    };
+    
+    startPolling();
+    
+    // Clean up on unmount
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [fetchCommentCounts]);
+
   const handleToggleCompletion = async (walkId: number, completed: boolean) => {
     try {
       console.log('[WalkDirectory] Starting toggle completion:', {
@@ -191,6 +257,11 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
         isCompleted: completedWalks.includes(walkId)
       });
       
+      // Optimistically update comment count if a comment is provided
+      if (comment.trim()) {
+        updateWalkCommentCount(walkId, true);
+      }
+      
       const response = await fetch('/api/walks/rate', {
         method: 'POST',
         headers: {
@@ -204,6 +275,11 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
       });
 
       if (!response.ok) {
+        // Revert optimistic update on error
+        if (comment.trim()) {
+          updateWalkCommentCount(walkId, false);
+        }
+        
         const data = await response.json();
         throw new Error(data.error || 'Failed to submit rating');
       }
@@ -220,6 +296,10 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
       if (!completedWalks.includes(walkId)) {
         setCompletedWalks(prev => [...prev, walkId]);
       }
+
+      // Refresh comment counts to ensure we have the latest data
+      // This is a fallback in case the optimistic update missed something
+      fetchCommentCounts();
 
       // Return the walk with updated rating values from the API
       return updatedRating;
@@ -337,6 +417,9 @@ export const WalkDirectory: React.FC<WalkDirectoryProps> = ({ walks }) => {
                       onToggleCompletion={handleToggleCompletion}
                       isInitialLoading={status === 'authenticated' && isLoadingCompletions}
                       onSubmitRating={handleSubmitRating}
+                      hasComments={walksWithComments[walk.id] > 0}
+                      commentCount={walksWithComments[walk.id] || 0}
+                      onCommentAdded={() => updateWalkCommentCount(walk.id, true)}
                     />
                   ))}
                 </div>

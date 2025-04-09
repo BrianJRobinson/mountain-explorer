@@ -17,6 +17,9 @@ interface WalkCardProps {
   onToggleCompletion: (walkId: number, completed: boolean) => Promise<void>;
   isInitialLoading?: boolean;
   onSubmitRating: (walkId: number, rating: number, comment: string) => Promise<Walk>;
+  hasComments: boolean;
+  commentCount: number;
+  onCommentAdded?: () => void;
 }
 
 export const WalkCard: React.FC<WalkCardProps> = ({
@@ -25,6 +28,9 @@ export const WalkCard: React.FC<WalkCardProps> = ({
   onToggleCompletion,
   isInitialLoading = false,
   onSubmitRating,
+  hasComments,
+  commentCount,
+  onCommentAdded,
 }) => {
   const { data: session } = useSession();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -35,27 +41,10 @@ export const WalkCard: React.FC<WalkCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
-  const [hasComments, setHasComments] = useState(false);
 
   // Derived state
   const hasUserRated = !!walk.userRating;
   const userRating = walk.userRating;
-
-  // Check if there are comments when component mounts
-  useEffect(() => {
-    const checkComments = async () => {
-      try {
-        const response = await fetch(`/api/walks/comments/count?walkId=${walk.id}`);
-        if (!response.ok) throw new Error('Failed to check comments');
-        const data = await response.json();
-        setHasComments(data.count > 0);
-      } catch (error) {
-        console.error('Error checking comments:', error);
-      }
-    };
-
-    checkComments();
-  }, [walk.id]);
 
   const handleSubmitRating = async () => {
     if (!selectedRating) return;
@@ -74,11 +63,6 @@ export const WalkCard: React.FC<WalkCardProps> = ({
       walk.userComment = comment.trim() || undefined;
       walk.averageRating = updatedWalk.averageRating;
       walk.totalRatings = updatedWalk.totalRatings;
-      
-      // Set hasComments to true if a comment was provided
-      if (comment.trim()) {
-        setHasComments(true);
-      }
       
       setShowRatingPanel(false);
       setShowCompletionModal(false);
@@ -221,6 +205,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
                 rating={walk.averageRating}
                 totalRatings={walk.totalRatings}
                 hasRecentComments={hasComments}
+                commentCount={commentCount}
                 isUserLoggedIn={!!session?.user}
                 hasUserRated={hasUserRated}
                 onShowComments={() => setShowComments(true)}
@@ -248,6 +233,7 @@ export const WalkCard: React.FC<WalkCardProps> = ({
             isOpen={showComments}
             onClose={() => setShowComments(false)}
             walkId={walk.id}
+            onCommentAdded={onCommentAdded}
           />
         )}
       </div>

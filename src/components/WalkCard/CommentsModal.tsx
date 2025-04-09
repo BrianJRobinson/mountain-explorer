@@ -17,12 +17,14 @@ interface CommentsModalProps {
   isOpen: boolean;
   onClose: () => void;
   walkId: number;
+  onCommentAdded?: () => void;
 }
 
 export const CommentsModal: React.FC<CommentsModalProps> = ({
   isOpen,
   onClose,
   walkId,
+  onCommentAdded,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +49,13 @@ export const CommentsModal: React.FC<CommentsModalProps> = ({
       fetchComments();
     }
   }, [isOpen, walkId]);
+
+  // Notify parent when comments change
+  useEffect(() => {
+    if (comments.length > 0 && onCommentAdded) {
+      onCommentAdded();
+    }
+  }, [comments, onCommentAdded]);
 
   if (!isOpen) return null;
 

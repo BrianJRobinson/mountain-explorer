@@ -20,7 +20,6 @@ export const SitesCardFooter: React.FC<SitesCardFooterProps> = ({
   onShowComments,
   onShowRatingPanel,
 }) => {
-  console.log("rating is " + rating?.toString() + " and hasRecentComments is " + hasRecentComments);
   return (
     <div className="pt-2 border-t border-gray-700/50 flex items-center justify-between">
       <div className="flex items-center gap-0.5">

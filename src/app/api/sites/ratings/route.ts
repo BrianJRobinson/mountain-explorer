@@ -15,7 +15,7 @@ export async function GET() {
 
     // Get all mountain ratings with their averages
     const siteRatings = await prisma.siteRating.groupBy({
-      by: ['sitesId'],
+      by: ['siteId'],
       _sum: {
         rating: true,
       },
@@ -26,7 +26,7 @@ export async function GET() {
 
     // Transform the data into a more usable format
     const ratings = siteRatings.map(rating => ({
-      sitesId: rating.sitesId,
+      siteId: rating.siteId,
       averageRating: rating._sum.rating ? rating._sum.rating / rating._count.rating : 0,
       totalRatings: rating._count.rating,
     }));

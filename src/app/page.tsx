@@ -7,8 +7,8 @@
 
 import { Navbar } from '@/components/Navbar';
 import Link from 'next/link';
-import { getServerSession } from 'next-auth';
-import { authOptions } from './api/auth/auth-options';
+//import { getServerSession } from 'next-auth';
+//import { authOptions } from './api/auth/auth-options';
 import { HeroAvatar } from '@/components/HeroAvatar';
 
 export default async function HomePage() {

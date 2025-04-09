@@ -17,12 +17,14 @@ interface CommentsModalProps {
   isOpen: boolean;
   onClose: () => void;
   siteId: number;
+  onCommentAdded?: () => void;
 }
 
 export const CommentsModal: React.FC<CommentsModalProps> = ({
   isOpen,
   onClose,
   siteId,
+  onCommentAdded,
 }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoading, setIsLoading] = useState(false);

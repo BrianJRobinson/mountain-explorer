@@ -43,9 +43,12 @@ export const SitesDetails: React.FC<SitesDetailsProps> = ({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
         </svg>
         <div className="flex gap-2">
-          <a href="#" className="text-sm hover:text-orange-400 transition-colors duration-300">
+          <button 
+            onClick={onShowMap} 
+            className="text-sm hover:text-orange-400 transition-colors duration-300"
+          >
             View on Map
-          </a>
+          </button>
         </div>
       </div>
     </div>
