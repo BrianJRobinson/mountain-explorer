@@ -24,6 +24,8 @@ model User {
   mountainRatings          MountainRating[]
   walkProgress            WalkCompletion[]
   walkRatings             WalkRating[]
+  siteProgress           SiteCompletion[]
+  siteRatings            SiteRating[]
   following                Follow[]             @relation("Following")
   followers                Follow[]             @relation("Followers")
   sentNotifications        Notification[]        @relation("NotificationSender")
@@ -74,6 +76,29 @@ model WalkRating {
   user       User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, walkId])
+}
+
+model SiteCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  siteId      Int
+  completedAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, siteId])
+}
+
+model SiteRating {
+  id         String   @id @default(cuid())
+  userId     String
+  siteId     Int
+  rating     Float
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, siteId])
 }
 
 model Follow {

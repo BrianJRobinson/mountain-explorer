@@ -82,6 +82,16 @@ export const Navbar = () => {
               >
                 Walks
               </Link>
+              <Link
+                href="/sites"
+                className={`text-sm font-medium transition-colors ${
+                  isActive('/sites')
+                    ? 'text-orange-500'
+                    : 'text-gray-300 hover:text-white'
+                }`}
+              >
+                Sites
+              </Link>              
             </div>
             
             {/* User Actions */}

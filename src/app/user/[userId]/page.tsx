@@ -21,12 +21,20 @@ interface WalkDetails {
   Distance_M: string;
 }
 
+interface SiteDetails {
+  id: number;
+  name: string;
+  longitude: number;
+  latitude: number;
+  kinds: string;
+}
+
 interface BaseReview {
   id: string;
   rating: number;
   comment: string | null;
   createdAt: Date;
-  type: 'mountain' | 'walk';
+  type: 'mountain' | 'walk' | 'site';
 }
 
 interface MountainReview extends BaseReview {
@@ -41,7 +49,13 @@ interface WalkReview extends BaseReview {
   walk: WalkDetails;
 }
 
-type Review = MountainReview | WalkReview;
+interface SiteReview extends BaseReview {
+  type: 'site';
+  siteId: number;
+  site: SiteDetails;
+}
+
+type Review = MountainReview | WalkReview | SiteReview;
 
 interface PageProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,16 +147,42 @@ export default async function Page({
     },
   });
 
+  // Fetch all walk ratings and comments by this user
+  const siteComments = await prisma.siteRating.findMany({
+    where: {
+      userId: userId,
+      comment: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      rating: true,
+      comment: true,
+      createdAt: true,
+      siteId: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });  
+
   // Load mountain data from JSON file
-  const mountainDataDirectory = path.join(process.cwd(), 'public/data');
-  const mountainFileContents = await fs.readFile(mountainDataDirectory + '/data.json', 'utf8');
+  const dataDirectory = path.join(process.cwd(), 'public/data');
+  const mountainFileContents = await fs.readFile(dataDirectory + '/Mountains.json', 'utf8');
   const mountainData = JSON.parse(mountainFileContents);
   const mountains: MountainDetails[] = mountainData.pageProps.mountains;
 
   // Load walk data from JSON file
-  const walkFileContents = await fs.readFile(mountainDataDirectory + '/Walks.json', 'utf8');
+  const walkFileContents = await fs.readFile(dataDirectory + '/Walks.json', 'utf8');
   const walkData = JSON.parse(walkFileContents);
   const walks: WalkDetails[] = walkData.Path_name;
+
+  // Load sites data from JSON file
+  const sitesContents = await fs.readFile(dataDirectory + '/sites.json', 'utf8');
+  const sitesData = JSON.parse(sitesContents);
+  console.log(sitesData);
+  const sites: SiteDetails[] = sitesData.features;
 
   // Create maps for quick lookups
   const mountainMap = new Map(
@@ -151,6 +191,11 @@ export default async function Page({
   const walkMap = new Map(
     walks.map(w => [w.id.toString(), w])
   );
+  const siteMap = new Map(
+    sites.map(s => [s.id.toString(), s])
+  );
+
+  console.log(sites);
 
   // Combine mountain reviews with details
   const mountainReviews: MountainReview[] = mountainComments.map(comment => {
@@ -188,8 +233,27 @@ export default async function Page({
     };
   });
 
+  // Combine site reviews with details
+  const siteReviews: SiteReview[] = siteComments.map(comment => {
+    const site = siteMap.get(String(comment.siteId));
+    if (!site) {
+      throw new Error(`Walk not found for comment ${comment.id}`);
+    }
+    return {
+      ...comment,
+      type: 'site',
+      site: {
+        id: parseInt(String(site.id)),
+        name: site.name,
+        latitude: site.latitude,
+        longitude: site.longitude,
+        kinds: site.kinds
+      }
+    };
+  });
+
   // Combine and sort all reviews by date
-  const allReviews: Review[] = [...mountainReviews, ...walkReviews].sort(
+  const allReviews: Review[] = [...mountainReviews, ...walkReviews, ...siteReviews].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
 

@@ -14,7 +14,7 @@ interface BaseReview {
   rating: number;
   comment: string | null;
   createdAt: Date;
-  type: 'mountain' | 'walk';
+  type: 'mountain' | 'walk' | 'site';
 }
 
 interface MountainReview extends BaseReview {
@@ -39,7 +39,19 @@ interface WalkReview extends BaseReview {
   };
 }
 
-type Review = MountainReview | WalkReview;
+interface SiteReview extends BaseReview {
+  type: 'site';
+  siteId: number;
+  site: {
+    id: number;
+    name: string;
+    longitude: number;
+    latitude: number;
+    kinds: string;
+  };
+}
+
+type Review = MountainReview | WalkReview | SiteReview;
 
 interface UserProfileProps {
   user: {
@@ -218,10 +230,12 @@ export function UserProfile({ user, reviews, isOwnProfile }: UserProfileProps) {
                   <Link 
                     href={review.type === 'mountain' 
                       ? `/?search=${encodeURIComponent(review.mountain.ukHillsDbName)}#mountains`
-                      : `/?search=${encodeURIComponent(review.walk.name)}#walks`}
+                      : review.type === 'walk'
+                        ? `/?search=${encodeURIComponent(review.walk.name)}#walks`
+                        : `/?search=${encodeURIComponent(review.site.name.length > 50 ? review.site.name.substring(0, 50) + '...' : review.site.name)}#sites`}
                     className="text-xl font-semibold text-orange-400 hover:text-orange-300 transition-all duration-300 line-clamp-1 group-hover:scale-105 inline-block"
                   >
-                    {review.type === 'mountain' ? review.mountain.ukHillsDbName : review.walk.name}
+                    {review.type === 'mountain' ? review.mountain.ukHillsDbName : review.type === 'site' ? review.site.name.length > 50 ? review.site.name.substring(0, 50) + '...' : review.site.name : review.walk.name.length > 50 ? review.walk.name.substring(0, 50) + '...' : review.walk.name}
                   </Link>
                 </div>
                 <div className="flex items-center justify-between mt-2">
@@ -248,10 +262,15 @@ export function UserProfile({ user, reviews, isOwnProfile }: UserProfileProps) {
                       <div className="transition-transform duration-300 group-hover:translate-x-1">Height: {review.mountain.Height}m</div>
                       <div className="transition-transform duration-300 group-hover:-translate-x-1">Region: {review.mountain.ukHillsDbSection}</div>
                     </>
-                  ) : (
+                  ) : review.type === 'walk' ? (
                     <>
                       <div className="transition-transform duration-300 group-hover:translate-x-1">Distance: {review.walk.Distance_K}km</div>
                       <div className="transition-transform duration-300 group-hover:-translate-x-1">{review.walk.Distance_M} miles</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="transition-transform duration-300 group-hover:translate-x-1">Latitude: {review.site.latitude}</div>
+                      <div className="transition-transform duration-300 group-hover:-translate-x-1">Longitude: {review.site.longitude}</div>
                     </>
                   )}
                 </div>

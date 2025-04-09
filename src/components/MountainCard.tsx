@@ -517,6 +517,15 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     if (!selectedRating) return;
 
     try {
+      console.log('[MountainCard] Starting rating submission:', {
+        mountainId: mountain.id,
+        selectedRating,
+        comment,
+        currentUserRating: mountain.userRating,
+        currentAverageRating: mountain.averageRating,
+        currentTotalRatings: mountain.totalRatings
+      });
+
       setIsSubmitting(true);
       
       const updatedMountain = await onSubmitRating(
@@ -524,12 +533,27 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         selectedRating, 
         comment
       );
+
+      console.log('[MountainCard] Received updated mountain:', {
+        updatedMountain,
+        willSetUserRating: selectedRating,
+        willSetUserComment: comment.trim() || undefined,
+        willSetAverageRating: updatedMountain.averageRating,
+        willSetTotalRatings: updatedMountain.totalRatings
+      });
       
       // Update all rating properties
       mountain.userRating = selectedRating;
       mountain.userComment = comment.trim() || undefined;
       mountain.averageRating = updatedMountain.averageRating;
       mountain.totalRatings = updatedMountain.totalRatings;
+
+      console.log('[MountainCard] Updated mountain object:', {
+        newUserRating: mountain.userRating,
+        newUserComment: mountain.userComment,
+        newAverageRating: mountain.averageRating,
+        newTotalRatings: mountain.totalRatings
+      });
       
       // Set hasComments to true since we just added a comment
       setHasComments(true);

@@ -1,29 +1,32 @@
 'use client';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { MountainCard } from './MountainCard';
+import { SitesCard } from './SitesCard';
 import { useSession } from 'next-auth/react';
-import { Mountain } from '@/app/types/Mountain';
+import { Site } from '@/app/types/Sites';
 import { toast } from 'react-hot-toast';
+import { SitesFilter } from './sites/SitesFilter';
 
-interface MountainDirectoryProps {
-  mountains: Mountain[];
+interface SitesDirectoryProps {
+  sites: Site[];
 }
 
-interface MountainCompletion {
-  mountainId: number;
+interface SiteCompletion {
+  siteId: number;
 }
 
-export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains }) => {
+export const SitesDirectory: React.FC<SitesDirectoryProps> = ({ sites }) => {
   const { data: session, status } = useSession();
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [showCompletedOnly, setShowCompletedOnly] = useState<boolean | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [completedMountains, setCompletedMountains] = useState<number[]>([]);
+  const [completedSites, setCompletedSites] = useState<number[]>([]);
   const [isLoadingCompletions, setIsLoadingCompletions] = useState(true);
-  const [columnCount, setColumnCount] = useState(5); // Default to 5 columns
+  const [columnCount, setColumnCount] = useState(4); // Default to 5 columns
+  const [siteRatings, setSiteRatings] = useState<Record<number, { rating: number; comment: string; averageRating: number; totalRatings: number }>>({});
   const parentRef = useRef<HTMLDivElement>(null);
+
 
   // Initialize search from URL parameter
   useEffect(() => {
@@ -43,7 +46,7 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const CARD_HEIGHT = IMAGE_HEIGHT + CONTENT_HEIGHT;
   const ROW_GAP = 8; // gap-4 instead of gap-6
 
-  const fetchCompletedMountains = useCallback(async () => {
+  const fetchCompletedSites = useCallback(async () => {
     try {
       if (!session?.user?.id) {
         console.log('No user ID available, skipping fetch');
@@ -53,7 +56,7 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
       setIsLoadingCompletions(true);
       
-      const response = await fetch('/api/mountains/completed', {
+      const response = await fetch('/api/sites/completed', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -63,10 +66,10 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
       
       if (response.ok) {
         const data = await response.json();
-        setCompletedMountains(data.map((completion: MountainCompletion) => completion.mountainId));
+        setCompletedSites(data.map((completion: SiteCompletion) => completion.siteId));
       } else {
         const errorData = await response.json();
-        console.error('Failed to fetch completed mountains:', {
+        console.error('Failed to fetch completed sites:', {
           status: response.status,
           statusText: response.statusText,
           error: errorData,
@@ -74,7 +77,7 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         });
       }
     } catch (error) {
-      console.error('Error in fetchCompletedMountains:', error);
+      console.error('Error in fetchCompletedSites:', error);
     } finally {
       setIsLoadingCompletions(false);
     }
@@ -82,22 +85,9 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
 
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      fetchCompletedMountains();
+      fetchCompletedSites();
     }
-  }, [session, status, fetchCompletedMountains]);
-
-  useEffect(() => {
-    console.log('Session status:', status);
-    console.log('Session data:', session);
-    if (status === 'unauthenticated') {
-      console.log('User is not authenticated');
-    } else if (status === 'loading') {
-      console.log('Session is loading...');
-    } else if (status === 'authenticated') {
-      console.log('User is authenticated:', session?.user);
-      console.log('User ID:', session?.user?.id);
-    }
-  }, [session, status]);
+  }, [session, status, fetchCompletedSites]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -114,7 +104,7 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
       if (width < 768) setColumnCount(1); // mobile
       else if (width < 1024) setColumnCount(2); // tablet
       else if (width < 1280) setColumnCount(3); // laptop
-      else setColumnCount(5); // desktop
+      else setColumnCount(4); // desktop
     };
 
     updateColumnCount();
@@ -122,21 +112,21 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
     return () => window.removeEventListener('resize', updateColumnCount);
   }, []);
 
-  const handleToggleCompletion = async (mountainId: number, completed: boolean) => {
+  const handleToggleCompletion = async (siteId: number, completed: boolean) => {
     try {
-      console.log('[MountainDirectory] Starting toggle completion:', {
-        mountainId,
+      console.log('[SitesDirectory] Starting toggle completion:', {
+        siteId,
         completed,
-        currentCompletedMountains: completedMountains
+        currentCompletedSites: completedSites
       });
 
       // Optimistically update the UI
-      setCompletedMountains(prev => {
+      setCompletedSites(prev => {
         const newState = completed 
-          ? [...prev, mountainId]
-          : prev.filter(id => id !== mountainId);
-        console.log('[MountainDirectory] Updated completedMountains state:', {
-          mountainId,
+          ? [...prev, siteId]
+          : prev.filter(id => id !== siteId);
+        console.log('[SitesDirectory] Updated completedSites state:', {
+          siteId,
           completed,
           previousState: prev,
           newState
@@ -144,27 +134,27 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         return newState;
       });
 
-      const response = await fetch('/api/mountains/toggle-completion', {
+      const response = await fetch('/api/sites/toggle-completion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          mountainId, 
+          siteId, 
           completed,
           userId: session?.user?.id 
         }),
       });
 
       if (!response.ok) {
-        console.log('[MountainDirectory] API call failed, reverting state');
+        console.log('[SitesDirectory] API call failed, reverting state');
         // Revert the optimistic update on error
-        setCompletedMountains(prev => {
+        setCompletedSites(prev => {
           const revertedState = completed 
-            ? prev.filter(id => id !== mountainId)
-            : [...prev, mountainId];
-          console.log('[MountainDirectory] Reverted completedMountains state:', {
-            mountainId,
+            ? prev.filter(id => id !== siteId)
+            : [...prev, siteId];
+          console.log('[SitesDirectory] Reverted completedSites state:', {
+            siteId,
             completed,
             previousState: prev,
             revertedState
@@ -174,20 +164,20 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         throw new Error('Failed to update completion status');
       }
 
-      console.log('[MountainDirectory] Toggle completion successful:', {
-        mountainId,
+      console.log('[SitesDirectory] Toggle completion successful:', {
+        siteId,
         completed,
-        currentCompletedMountains: completedMountains
+        currentCompletedSites: completedSites
       });
 
       // Show success toast
       toast.success(
-        completed ? 'Mountain marked as completed!' : 'Mountain marked as not completed',
+        completed ? 'Site marked as completed!' : 'Site marked as not completed',
         { duration: 2000 }
       );
 
     } catch (error) {
-      console.error('[MountainDirectory] Error in handleToggleCompletion:', error);
+      console.error('[SitesDirectory] Error in handleToggleCompletion:', error);
       toast.error('Failed to update completion status. Please try again.', {
         duration: 3000,
       });
@@ -196,27 +186,27 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
     }
   };
 
-  const handleMapMarkerClick = (mountainName: string) => {
-    setSearchQuery(mountainName);
-    setDebouncedSearch(mountainName);
+  const handleMapMarkerClick = (siteName: string) => {
+    setSearchQuery(siteName);
+    setDebouncedSearch(siteName);
   };
 
-  const handleSubmitRating = async (mountainId: number, rating: number, comment: string) => {
+  const handleSubmitRating = async (siteId: number, rating: number, comment: string) => {
     try {
-      console.log('[MountainDirectory] Starting rating submission:', { 
-        mountainId, 
+      console.log('[SitesDirectory] Starting rating submission:', { 
+        siteId, 
         rating, 
         comment,
-        isCompleted: completedMountains.includes(mountainId)
+        isCompleted: completedSites.includes(siteId)
       });
       
-      const response = await fetch('/api/mountains/rate', {
+      const response = await fetch('/api/sites/rate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          mountainId,
+          siteId,
           rating,
           comment: comment.trim() || null
         }),
@@ -226,18 +216,18 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         const data = await response.json();
         throw new Error(data.error || 'Failed to submit rating');
       }
-
-      // Get the updated mountain data
+      
+      // Get the updated sites data
       const updatedRating = await response.json();
-      console.log('[MountainDirectory] Rating submission successful:', {
-        mountainId,
+      console.log('[SitesDirectory] Rating submission successful:', {
+        siteId,
         updatedRating,
-        isCompleted: completedMountains.includes(mountainId)
+        isCompleted: completedSites.includes(siteId)
       });
 
-      // Update completion state since rating automatically completes the mountain
-      if (!completedMountains.includes(mountainId)) {
-        setCompletedMountains(prev => [...prev, mountainId]);
+      // Update completion state since rating automatically completes the site
+      if (!completedSites.includes(siteId)) {
+        setCompletedSites(prev => [...prev, siteId]);
       }
 
       // Return the mountain with updated rating values
@@ -248,26 +238,65 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
         userRating: rating
       };
 
-      console.log('[MountainDirectory] Returning data:', returnData);
+      console.log('[SitesDirectory] Returning data:', returnData);
       return returnData;
+
     } catch (error) {
-      console.error('[MountainDirectory] Error in handleSubmitRating:', error);
+      console.error('[SitesDirectory] Error in handleSubmitRating:', error);
       throw error;
     }
   };
 
-  const filteredMountains = mountains.filter(mountain => {
-    const matchesCategory = selectedCategory === null || mountain.MountainCategoryID === selectedCategory;
-    const matchesSearch = mountain.ukHillsDbName.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesCompleted = showCompletedOnly === false || showCompletedOnly === null || completedMountains.includes(mountain.id);
-    return matchesCategory && matchesSearch && matchesCompleted;
+  // Fetch user ratings for sites
+  const fetchUserRatings = useCallback(async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      const response = await fetch('/api/sites/user-ratings', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const ratingsMap = data.reduce((acc: Record<number, any>, rating: any) => {
+          acc[rating.siteId] = {
+            rating: rating.rating,
+            comment: rating.comment,
+            averageRating: rating.averageRating,
+            totalRatings: rating.totalRatings
+          };
+          return acc;
+        }, {});
+        setSiteRatings(ratingsMap);
+      }
+    } catch (error) {
+      console.error('Error fetching user ratings:', error);
+    }
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      fetchUserRatings();
+    }
+  }, [session, status, fetchUserRatings]);
+
+  // Filter sites
+  const filteredSites = sites; 
+  console.log(filteredSites);
+  /*const filteredSites = sites.features.filter(feature => {
+    const matchesTypes = selectedTypes.length === 0 || 
+      selectedTypes.some(type => feature.kinds.includes(type));
+    const matchesSearch = feature.name.toLowerCase().includes(debouncedSearch.toLowerCase());
+    const matchesCompleted = showCompletedOnly === false || showCompletedOnly === null || completedSites.includes(feature.id);
+    return matchesTypes && matchesSearch && matchesCompleted;
   });
-
-  const munroCount = filteredMountains.filter(m => m.MountainCategoryID === 12).length;
-  const corbettCount = filteredMountains.filter(m => m.MountainCategoryID === 11).length;
-
+*/
   // Calculate rows needed based on number of items and columns
-  const rowCount = Math.ceil(filteredMountains.length / columnCount);
+  const rowCount = Math.ceil(filteredSites.length / columnCount);
 
   const virtualizer = useVirtualizer({
     count: rowCount,
@@ -279,52 +308,16 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
   const totalHeight = virtualizer.getTotalSize();
 
   return (
-    <div className="container mx-auto px-4 py-8 min-h-screen" id="mountains">
+    <div className="container mx-auto px-4 py-8 min-h-screen" id="sites">
       <div className="sticky top-16 z-40 bg-gray-900/95 backdrop-blur-sm py-4 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex flex-wrap gap-2 p-2 w-full md:w-auto bg-gray-900 rounded-xl shadow-inner">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setSelectedCategory(null);
-              }}
-              className={`px-6 py-2 rounded-lg transition-all duration-200 ${
-                selectedCategory === null
-                  ? 'bg-orange-500 text-white shadow-lg'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 shadow-inner border border-gray-700'
-              }`}
-            >
-              All ({munroCount + corbettCount })
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setSelectedCategory(12);
-              }}
-              className={`px-6 py-2 rounded-lg transition-all duration-200 ${
-                selectedCategory === 12
-                  ? 'bg-orange-500 text-white shadow-lg'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 shadow-inner border border-gray-700'
-              }`}
-            >
-              Munros ({munroCount})
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                setSelectedCategory(11);
-              }}
-              className={`px-6 py-2 rounded-lg transition-all duration-200 ${
-                selectedCategory === 11
-                  ? 'bg-orange-500 text-white shadow-lg'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 shadow-inner border border-gray-700'
-              }`}
-            >
-              Corbetts ({corbettCount})
-            </button>
+        <div className="flex flex-wrap gap-2 p-2 w-full md:w-auto bg-gray-900 rounded-xl shadow-inner">
+            {/*<SitesFilter
+              allTypes={allTypes}
+              selectedTypes={selectedTypes}
+              onTypeChange={setSelectedTypes}
+              siteCounts={siteCounts}
+            />*/}
             <button
               type="button"
               onClick={(e) => {
@@ -337,13 +330,13 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700 shadow-inner border border-gray-700'
               }`}
             >
-              Completed ({completedMountains.length})
+              Completed ({completedSites.length})
             </button>            
           </div>
           <div className="w-full md:w-auto relative">
             <input
               type="text"
-              placeholder="Search mountains..."
+              placeholder="Search sites..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full md:w-64 pl-4 pr-10 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-transparent shadow-inner"
@@ -383,8 +376,9 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
           }}
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {
+            console.log(filteredSites);
             const startIndex = virtualRow.index * columnCount;
-            const rowMountains = filteredMountains.slice(startIndex, startIndex + columnCount);
+            const rowSites = filteredSites.slice(startIndex, startIndex + columnCount);
 
             return (
               <div
@@ -399,17 +393,17 @@ export const MountainDirectory: React.FC<MountainDirectoryProps> = ({ mountains 
                 }}
               >
                 <div 
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
                   style={{ height: CARD_HEIGHT }}
                 >
-                  {rowMountains.map((mountain) => (
-                    <MountainCard
-                      key={mountain.id}
-                      mountain={mountain}
-                      isCompleted={completedMountains.includes(mountain.id)}
+                  {rowSites.map((site) => (
+                    <SitesCard
+                      key={site.id}
+                      site={site}
+                      isCompleted={completedSites.includes(site.id)}
                       onToggleCompletion={handleToggleCompletion}
                       isInitialLoading={status === 'authenticated' && isLoadingCompletions}
-                      allMountains={mountains}
+                      allSites={sites}
                       onMapMarkerClick={handleMapMarkerClick}
                       onSubmitRating={handleSubmitRating}
                     />

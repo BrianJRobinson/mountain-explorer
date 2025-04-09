@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 
-export type NotificationType = 'MOUNTAIN_COMPLETED' | 'WALK_COMPLETED' |'FOLLOWED';
+export type NotificationType = 'MOUNTAIN_COMPLETED' | 'WALK_COMPLETED' | 'SITE_COMPLETED' | 'FOLLOWED';
 
 interface CreateNotificationParams {
   type: NotificationType;
@@ -76,6 +76,31 @@ export async function createWalkCompletionNotifications(userId: string, walkId: 
         recipientId: follower.followerId,
         datasetId: 2,  // 2 for walks
         activityId: walkId
+      })
+    )
+  );
+}
+
+export async function createSiteCompletionNotifications(userId: string, siteId: number) {
+  // Get all followers of the user
+  const followers = await prisma.follow.findMany({
+    where: {
+      followingId: userId
+    },
+    select: {
+      followerId: true
+    }
+  });
+
+  // Create notifications for all followers
+  return Promise.all(
+    followers.map(follower =>
+      createNotification({
+        type: 'SITE_COMPLETED',
+        senderId: userId,
+        recipientId: follower.followerId,
+        datasetId: 3,  // 3 for sites
+        activityId: siteId
       })
     )
   );
