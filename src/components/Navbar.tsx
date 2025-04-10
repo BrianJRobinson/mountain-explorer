@@ -150,6 +150,17 @@ export const Navbar = () => {
             >
               Walks
             </Link>
+            <Link
+              href="/sites"
+              className={`block px-4 py-2 text-sm ${
+                isActive('/sites')
+                  ? 'text-orange-500 bg-gray-800/50'
+                  : 'text-gray-300 hover:bg-gray-800/30 hover:text-white'
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Sites
+            </Link>            
           </div>
         </div>
       </div>
