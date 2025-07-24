@@ -1,0 +1,10 @@
+/* CSS Module for Hotel Details Page */
+
+.descriptionContainer strong {
+  color: #ea580c; /* Corresponds to Tailwind's orange-600 */
+  font-weight: 600;
+}
+.descriptionContainer p {
+  margin-bottom: 1rem;
+}
+

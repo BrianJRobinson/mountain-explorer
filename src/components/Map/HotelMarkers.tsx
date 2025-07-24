@@ -116,7 +116,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   };
   
   // Use the current map center and dynamic radius for fetching hotels
-  const { hotels, loading, refetch } = useHotelsNearby(
+  const { nearbyHotels: hotels = [], loading, error, refetch } = useHotelsNearby(
     mapCenter.lat, 
     mapCenter.lng, 
     dynamicRadius, 
@@ -443,6 +443,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
                     <div class="text-gray-700 text-sm">${hotel.city || ''}${hotel.country ? `, ${hotel.country}` : ''}</div>
                     ${(hotel.starRating || 0) > 0 ? `<div class="text-yellow-500">${'★'.repeat(Math.floor(hotel.starRating || 0))}</div>` : ''}
                     ${(hotel.rating || 0) > 0 ? `<div class="text-blue-500 font-semibold">Rating: ${(hotel.rating || 0).toFixed(1)}/10</div>` : ''}
+                    <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white py-2 px-4 rounded-md text-sm font-medium transition-colors">View Details</a>
                   </div>
                 `;
 
@@ -528,6 +529,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
                   <div class="text-gray-700 text-sm">${hotel.city || ''}${hotel.country ? `, ${hotel.country}` : ''}</div>
                   ${(hotel.starRating || 0) > 0 ? `<div class="text-yellow-500">${'★'.repeat(Math.floor(hotel.starRating || 0))}</div>` : ''}
                   ${(hotel.rating || 0) > 0 ? `<div class="text-blue-500 font-semibold">Rating: ${(hotel.rating || 0).toFixed(1)}/10</div>` : ''}
+                  <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white py-2 px-4 rounded-md text-sm font-medium transition-colors">View Details</a>
                 </div>
               </div>`,
               { className: 'hotel-popup' }
@@ -588,6 +590,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
                   <div class="text-gray-700 text-sm">${hotel.city || ''}${hotel.country ? `, ${hotel.country}` : ''}</div>
                   ${(hotel.starRating || 0) > 0 ? `<div class="text-yellow-500">${'★'.repeat(Math.floor(hotel.starRating || 0))}</div>` : ''}
                   ${(hotel.rating || 0) > 0 ? `<div class="text-blue-500 font-semibold">Rating: ${(hotel.rating || 0).toFixed(1)}/10</div>` : ''}
+                  <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white py-2 px-4 rounded-md text-sm font-medium transition-colors">View Details</a>
                 </div>
               </div>`,
               { className: 'hotel-popup' }

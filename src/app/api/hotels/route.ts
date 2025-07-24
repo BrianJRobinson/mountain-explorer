@@ -127,6 +127,12 @@ export async function GET(request: NextRequest) {
     }
     
     console.log(`[API] Successfully extracted ${hotels.length} hotels`);
+
+    // Manually limit the number of hotels to 50, as the API does not support a limit parameter
+    if (hotels.length > 50) {
+      hotels = hotels.slice(0, 50);
+      console.log(`[API] Returning ${hotels.length} hotels after applying limit`);
+    }
     
     // If no hotels were found, use mock data instead
     if (hotels.length === 0) {

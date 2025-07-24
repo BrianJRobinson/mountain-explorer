@@ -18,6 +18,37 @@ export interface Hotel {
   thumbnail?: string;
 }
 
+export interface HotelDetails extends Hotel {
+  // Additional fields for detailed hotel view
+  amenities?: string[];
+  checkInTime?: string;
+  checkOutTime?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  roomTypes?: RoomType[];
+  reviews?: Review[];
+}
+
+export interface RoomType {
+  id: string;
+  name: string;
+  description?: string;
+  maxOccupancy: number;
+  price?: number;
+  currency?: string;
+  images?: string[];
+}
+
+export interface Review {
+  id: string;
+  author: string;
+  date: string;
+  rating: number;
+  comment: string;
+}
+
+
 // Cache for storing hotel data to reduce API calls
 const hotelCache = new Map<string, { data: Hotel[], timestamp: number }>();
 const CACHE_EXPIRY = 1000 * 60 * 30; // 30 minutes
@@ -29,7 +60,7 @@ const CACHE_EXPIRY = 1000 * 60 * 30; // 30 minutes
  * @param radius Radius in meters to search for hotels (default: 10000)
  * @returns Array of hotels
  */
-export async function getHotelsNearby(latitude: number, longitude: number, radius: number = 10000): Promise<Hotel[]> {
+export async function getHotelsNearby(latitude: number, longitude: number, radius: number = 10000, excludeHotelId?: string): Promise<Hotel[]> {
   // Create a cache key based on the search parameters
   const cacheKey = `${latitude.toFixed(4)}_${longitude.toFixed(4)}_${radius}`;
   
@@ -62,12 +93,14 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
     });
     
     const hotels = data.hotels || [];
+
+    const filteredHotels = excludeHotelId ? hotels.filter((h: Hotel) => h.id !== excludeHotelId) : hotels;
     
     // Cache the results
-    hotelCache.set(cacheKey, { data: hotels, timestamp: Date.now() });
+    hotelCache.set(cacheKey, { data: filteredHotels, timestamp: Date.now() });
     
-    console.log(`[hotelService] Found ${hotels.length} hotels`);
-    return hotels;
+    console.log(`[hotelService] Found ${filteredHotels.length} hotels`);
+    return filteredHotels;
   } catch (error) {
     console.error('[hotelService] Error fetching hotels:', error);
     return [];
@@ -77,7 +110,79 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
 /**
  * React hook for fetching hotels near a location
  */
-export function useHotelsNearby(lat: number, lng: number, radius: number = 10000, enabled: boolean = true) {
+/**
+ * Fetches detailed information about a specific hotel by ID
+ * @param hotelId The unique identifier of the hotel
+ * @returns Detailed hotel information
+ */
+export async function getHotelDetails(hotelId: string): Promise<HotelDetails | null> {
+  try {
+    console.log(`[hotelService] Fetching details for hotel ID: ${hotelId}`);
+    
+    // Use our Next.js API route as a proxy
+    const response = await fetch(`/api/hotels/${hotelId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching hotel details: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('[hotelService] Received hotel details:', data);
+    
+    return data.hotel || null;
+  } catch (error) {
+    console.error('[hotelService] Error fetching hotel details:', error);
+    return null;
+  }
+}
+
+/**
+ * React hook for fetching hotel details
+ */
+export function useHotelDetails(hotelId: string | null) {
+  const [hotel, setHotel] = useState<HotelDetails | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchHotelDetails = async () => {
+      if (!hotelId) {
+        return;
+      }
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const data = await getHotelDetails(hotelId);
+        if (isMounted) {
+          setHotel(data);
+        }
+      } catch (err) {
+        console.error('[useHotelDetails] Error:', err);
+        if (isMounted) {
+          setError(err instanceof Error ? err : new Error('Unknown error fetching hotel details'));
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchHotelDetails();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [hotelId]);
+  
+  return { hotel, loading, error };
+}
+
+export function useHotelsNearby(lat: number, lng: number, radius: number = 10000, enabled: boolean = true, excludeHotelId?: string) {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -103,7 +208,7 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
       setError(null);
       
       try {
-        const data = await getHotelsNearby(lat, lng, radius);
+        const data = await getHotelsNearby(lat, lng, radius, excludeHotelId);
         console.log('[useHotelsNearby] Received hotel data:', { count: data.length, firstHotel: data[0] });
         if (isMounted) {
           setHotels(data);
@@ -125,7 +230,7 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
     return () => {
       isMounted = false;
     };
-  }, [lat, lng, radius, enabled, fetchTrigger]);
+  }, [lat, lng, radius, enabled, fetchTrigger, excludeHotelId]);
   
-  return { hotels, loading, error, refetch };
+  return { nearbyHotels: hotels, loading, error, refetch };
 }
