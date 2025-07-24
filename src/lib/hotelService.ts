@@ -200,6 +200,8 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
     const fetchHotels = async () => {
       if (!lat || !lng || !enabled) {
         console.log('[useHotelsNearby] Not fetching hotels:', { lat, lng, enabled });
+        setHotels([]); // Clear hotels if fetching is disabled
+        setLoading(false);
         return;
       }
       

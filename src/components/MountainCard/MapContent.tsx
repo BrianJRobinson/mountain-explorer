@@ -383,6 +383,7 @@ export const MapContent: React.FC<MapContentProps> = ({
     map.current = L.map(mapContainer.current, {
       scrollWheelZoom: true,
       zoomControl: true,
+      maxZoom: 18, // Set a max zoom level to avoid errors
     }).setView([lat, lng], 13);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -476,23 +477,21 @@ export const MapContent: React.FC<MapContentProps> = ({
       className="w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden bg-gray-700 relative"
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Map content only - hotel toggle moved to header */}
-      
-      {/* Hotel Markers */}
-      {map.current || maplibreMap.current ? (
+      {/* Conditionally render HotelMarkers with the correct props */}
+      {showHotels && (map.current || maplibreMap.current) && (
         <HotelMarkers
           map={map.current}
           maplibreMap={maplibreMap.current}
           is3DMode={is3DMode}
           centerLat={parseFloat(mountain.ukHillsDbLatitude)}
           centerLng={parseFloat(mountain.ukHillsDbLongitude)}
-          radius={10000} // 10km radius
+          radius={10000} // Default 10km radius
           visible={showHotels}
           onRefreshReady={onRefreshReady}
           onLoadingChange={onLoadingChange}
-          useManualRefresh={true} // Use manual refresh instead of auto-refresh
+          useManualRefresh={true} // Controlled by parent component
         />
-      ) : null}
+      )}
       
       {isLoadingMarkers && (
         <div className="absolute bottom-4 right-4 bg-gray-900/80 text-white text-sm px-3 py-1.5 rounded-full">
@@ -501,4 +500,4 @@ export const MapContent: React.FC<MapContentProps> = ({
       )}
     </div>
   );
-}; 
+};

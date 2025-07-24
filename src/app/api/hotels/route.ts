@@ -134,38 +134,7 @@ export async function GET(request: NextRequest) {
       console.log(`[API] Returning ${hotels.length} hotels after applying limit`);
     }
     
-    // If no hotels were found, use mock data instead
-    if (hotels.length === 0) {
-      console.log('[API] No hotels found in API response, using mock data');
-      return NextResponse.json({
-        hotels: [
-          {
-            id: 'mock-hotel-1',
-            name: 'Mountain View Hotel',
-            address: '123 Mountain Road',
-            city: 'Highland',
-            country: 'Scotland',
-            latitude: parseFloat(latitude || '0') + 0.01,
-            longitude: parseFloat(longitude || '0') + 0.01,
-            rating: 4.5,
-            images: ['https://via.placeholder.com/150'],
-            starRating: 4
-          },
-          {
-            id: 'mock-hotel-2',
-            name: 'Highland Lodge',
-            address: '456 Valley Street',
-            city: 'Highland',
-            country: 'Scotland',
-            latitude: parseFloat(latitude || '0') - 0.01,
-            longitude: parseFloat(longitude || '0') - 0.01,
-            rating: 4.2,
-            images: ['https://via.placeholder.com/150'],
-            starRating: 3
-          }
-        ]
-      });
-    }
+
     
     // Return the data in the expected format with hotels array
     return NextResponse.json({ hotels });
