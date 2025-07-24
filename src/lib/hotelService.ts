@@ -189,8 +189,17 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
   const [fetchTrigger, setFetchTrigger] = useState(0); // To manually trigger refetch
   
   // Function to manually trigger a refetch
-  const refetch = () => {
+  const refetch = (newLat?: number, newLng?: number, newRadius?: number) => {
     console.log('[hotelService] Manually refetching hotels');
+    // If new coordinates are provided, update the state before triggering the fetch
+    if (newLat !== undefined && newLng !== undefined) {
+      // This part is tricky because we can't directly set state and then fetch
+      // in the same cycle. The fetch trigger is the primary mechanism.
+      // The actual state update for lat/lng should happen in the component calling the hook.
+      // The purpose here is to ensure the useEffect dependency check works.
+      // A better approach is to handle the coordinate update in the component
+      // and just use the trigger here. The logic will be in HotelMarkers.tsx
+    }
     setFetchTrigger(prev => prev + 1);
   };
 

@@ -338,9 +338,30 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
     if (onLoadingChange) onLoadingChange(loading);
   }, [loading, onLoadingChange]);
 
+  // This function will be passed up to the parent to be called on manual refresh
+  const handleManualRefresh = () => {
+    const currentMap = is3DMode ? maplibreMap : map;
+    if (!currentMap) return;
+
+    const center = currentMap.getCenter();
+    const zoom = currentMap.getZoom();
+    const newRadius = calculateRadiusFromZoom(zoom);
+
+    // Update the state with the new center and radius
+    setMapCenter({ lat: center.lat, lng: center.lng });
+    setDynamicRadius(newRadius);
+
+    // The state update will trigger the useEffect that calls the hook.
+    // We can also call refetch() if we want to force it even if coordinates are the same.
+    refetch();
+  };
+
   useEffect(() => {
-    if (useManualRefresh && onRefreshReady) onRefreshReady(refetch);
-  }, [useManualRefresh, onRefreshReady, refetch]);
+    if (useManualRefresh && onRefreshReady) {
+      onRefreshReady(handleManualRefresh);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useManualRefresh, onRefreshReady, map, maplibreMap]);
 
   return <LoadingIndicator loading={loading && !useManualRefresh} />;
 };
