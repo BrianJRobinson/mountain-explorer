@@ -2,21 +2,28 @@ import React, { useEffect, useRef, useCallback, useState } from 'react';
 import type { Map as LeafletMap } from 'leaflet';
 import type { Map as MapLibreMap, MapOptions, Marker } from 'maplibre-gl';
 import { Mountain } from '@/app/types/Mountain';
+import { HotelMarkers } from '../Map/HotelMarkers';
 
 interface MapContentProps {
   mountain: Mountain;
   allMountains: Mountain[];
   is3DMode: boolean;
+  showHotels: boolean;
   onMountainSelect?: (mountainName: string) => void;
   onClose: () => void;
+  onRefreshReady?: (refreshFn: () => void) => void;
+  onLoadingChange?: (isLoading: boolean) => void;
 }
 
 export const MapContent: React.FC<MapContentProps> = ({
   mountain,
   allMountains,
   is3DMode,
+  showHotels,
   onMountainSelect,
   onClose,
+  onRefreshReady,
+  onLoadingChange,
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -185,7 +192,7 @@ export const MapContent: React.FC<MapContentProps> = ({
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+            attribution: ' OpenStreetMap contributors'
           },
           'terrain-rgb': {
             type: 'raster-dem',
@@ -469,6 +476,24 @@ export const MapContent: React.FC<MapContentProps> = ({
       className="w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden bg-gray-700 relative"
       onClick={(e) => e.stopPropagation()}
     >
+      {/* Map content only - hotel toggle moved to header */}
+      
+      {/* Hotel Markers */}
+      {map.current || maplibreMap.current ? (
+        <HotelMarkers
+          map={map.current}
+          maplibreMap={maplibreMap.current}
+          is3DMode={is3DMode}
+          centerLat={parseFloat(mountain.ukHillsDbLatitude)}
+          centerLng={parseFloat(mountain.ukHillsDbLongitude)}
+          radius={10000} // 10km radius
+          visible={showHotels}
+          onRefreshReady={onRefreshReady}
+          onLoadingChange={onLoadingChange}
+          useManualRefresh={true} // Use manual refresh instead of auto-refresh
+        />
+      ) : null}
+      
       {isLoadingMarkers && (
         <div className="absolute bottom-4 right-4 bg-gray-900/80 text-white text-sm px-3 py-1.5 rounded-full">
           Loading markers...

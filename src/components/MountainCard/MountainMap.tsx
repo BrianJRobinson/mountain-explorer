@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Mountain } from '@/app/types/Mountain';
 import { MapLoader } from './MapLoader';
@@ -21,6 +21,9 @@ export const MountainMap: React.FC<MountainMapProps> = ({
   onClose,
 }) => {
   const [is3DMode, setIs3DMode] = useState(false);
+  const [showHotels, setShowHotels] = useState(false);
+  const [isHotelLoading, setIsHotelLoading] = useState(false);
+  const refreshHotelsRef = useRef<(() => void) | null>(null);
 
   if (!isOpen) return null;
 
@@ -46,6 +49,41 @@ export const MountainMap: React.FC<MountainMapProps> = ({
                 label={is3DMode ? 'Switch to 2D view' : 'Switch to 3D view'}
               />
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-300">Hotels</span>
+              <ToggleButton
+                isToggled={showHotels}
+                onToggle={() => setShowHotels(!showHotels)}
+                size="sm"
+                label={showHotels ? 'Hide Hotels' : 'Show Hotels'}
+              />
+              {showHotels && (
+                <button
+                  onClick={() => {
+                    if (refreshHotelsRef.current) {
+                      setIsHotelLoading(true);
+                      refreshHotelsRef.current();
+                    }
+                  }}
+                  disabled={isHotelLoading}
+                  className={`flex items-center justify-center w-6 h-6 rounded-md transition-colors ${
+                    isHotelLoading 
+                      ? 'bg-purple-700 text-white cursor-not-allowed' 
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                  }`}
+                  title="Refresh hotel data"
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    viewBox="0 0 24 24" 
+                    fill="currentColor" 
+                    className={`w-3.5 h-3.5 ${isHotelLoading ? 'animate-spin' : ''}`}
+                  >
+                    <path fillRule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors"
@@ -62,8 +100,13 @@ export const MountainMap: React.FC<MountainMapProps> = ({
               mountain={mountain}
               allMountains={allMountains}
               is3DMode={is3DMode}
+              showHotels={showHotels}
               onMountainSelect={onMountainSelect}
               onClose={onClose}
+              onRefreshReady={(refreshFn) => {
+                refreshHotelsRef.current = refreshFn;
+              }}
+              onLoadingChange={setIsHotelLoading}
             />
           </MapLoader>
         </div>

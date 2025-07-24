@@ -1,0 +1,52 @@
+.hotel-marker {
+  cursor: pointer;
+}
+
+.hotel-marker-icon {
+  display: block;
+}
+
+.hotel-popup .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.hotel-popup .leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.4;
+}
+
+/* Marker cluster customization */
+.marker-cluster {
+  background-color: rgba(66, 135, 245, 0.6);
+}
+
+.marker-cluster div {
+  background-color: rgba(66, 135, 245, 0.8);
+  color: white;
+  font-weight: bold;
+}
+
+.marker-cluster-small {
+  background-color: rgba(66, 135, 245, 0.6);
+}
+
+.marker-cluster-small div {
+  background-color: rgba(66, 135, 245, 0.8);
+}
+
+.marker-cluster-medium {
+  background-color: rgba(66, 135, 245, 0.6);
+}
+
+.marker-cluster-medium div {
+  background-color: rgba(66, 135, 245, 0.8);
+}
+
+.marker-cluster-large {
+  background-color: rgba(66, 135, 245, 0.6);
+}
+
+.marker-cluster-large div {
+  background-color: rgba(66, 135, 245, 0.8);
+}
