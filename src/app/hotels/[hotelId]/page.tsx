@@ -22,9 +22,40 @@ const getDayAfterTomorrowDate = () => {
   return d.toISOString().split('T')[0];
 };
 
+// Calculate distance between two coordinates using Haversine formula
+const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in kilometers
+};
+
+// Format distance based on locale (km for metric, miles for imperial)
+const formatDistance = (distanceKm: number): string => {
+  // Use navigator.language to detect locale, default to metric for most of the world
+  const locale = typeof navigator !== 'undefined' ? navigator.language : 'en-GB';
+  const useImperial = locale.startsWith('en-US'); // Only US uses miles primarily
+  
+  if (useImperial) {
+    const distanceMiles = distanceKm * 0.621371; // Convert km to miles
+    return `Within ${distanceMiles.toFixed(1)} miles`;
+  } else {
+    return `Within ${distanceKm.toFixed(1)} km`;
+  }
+};
+
 // --- Nearby Hotels Sidebar Component ---
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const NearbyHotels: React.FC<{ hotels: Hotel[] | undefined, loading: boolean, error: any }> = ({ hotels, loading, error }) => {
+const NearbyHotels: React.FC<{ 
+  hotels: Hotel[] | undefined, 
+  loading: boolean, 
+  error: any,
+  referenceCoordinates?: { lat: number; lng: number }
+}> = ({ hotels, loading, error, referenceCoordinates }) => {
   if (loading) return <div className="mt-8"><p>Loading nearby hotels...</p></div>;
   if (error) return <div className="mt-8"><p className="text-red-500">Error loading nearby hotels.</p></div>;
   if (!hotels || hotels.length === 0) return <div className="mt-8"><p>No nearby hotels found.</p></div>;
@@ -51,6 +82,17 @@ const NearbyHotels: React.FC<{ hotels: Hotel[] | undefined, loading: boolean, er
             <div className="p-3 flex flex-col flex-grow">
               <h3 className="font-semibold text-md text-orange-600 truncate" title={nearbyHotel.name}>{nearbyHotel.name}</h3>
               <p className="text-sm text-gray-500 flex-grow">{nearbyHotel.city}</p>
+              {/* Distance display for each nearby hotel */}
+              {referenceCoordinates && nearbyHotel.latitude && nearbyHotel.longitude && (
+                <p className="text-orange-400 text-xs mt-1 font-medium">
+                  📍 {formatDistance(calculateDistance(
+                    referenceCoordinates.lat,
+                    referenceCoordinates.lng,
+                    nearbyHotel.latitude,
+                    nearbyHotel.longitude
+                  ))}
+                </p>
+              )}
               <div className="mt-2 pt-2 border-t border-gray-100">
                 {(nearbyHotel.starRating ?? 0) > 0 && (
                   <div className="text-yellow-500 flex items-center text-sm">
@@ -107,12 +149,21 @@ export default function HotelDetailsPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* --- Main Hotel Details --- */}
-          <HotelDetailsContent hotel={hotel} starsFromQuery={starsFromQuery} />
+          <HotelDetailsContent 
+            hotel={hotel} 
+            starsFromQuery={starsFromQuery}
+            referenceCoordinates={urlLat && urlLng ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) } : undefined}
+          />
 
           {/* --- Nearby Hotels Section --- */}
           <div className="mt-12">
             {hasValidCoordinates ? (
-              <NearbyHotels hotels={nearbyHotels} loading={nearbyLoading} error={nearbyError} />
+              <NearbyHotels 
+                hotels={nearbyHotels} 
+                loading={nearbyLoading} 
+                error={nearbyError}
+                referenceCoordinates={urlLat && urlLng ? { lat: parseFloat(urlLat), lng: parseFloat(urlLng) } : undefined}
+              />
             ) : (
               <div>
                 <h2 className="text-3xl font-bold text-orange-600 mb-6">Nearby Hotels</h2>
@@ -132,9 +183,31 @@ function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
 }
 
-function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; starsFromQuery: string | null }) {
+function HotelDetailsContent({ 
+  hotel, 
+  starsFromQuery, 
+  referenceCoordinates 
+}: { 
+  hotel: HotelDetails; 
+  starsFromQuery: string | null;
+  referenceCoordinates?: { lat: number; lng: number };
+}) {
   const [selectedDate, setSelectedDate] = useState({ checkIn: getTomorrowDate(), checkOut: getDayAfterTomorrowDate() });
   const [guests, setGuests] = useState({ adults: 2, children: 0 });
+
+  // Debug logging for distance display
+  console.log('Distance Debug:', {
+    referenceCoordinates,
+    hotelLat: hotel.latitude,
+    hotelLng: hotel.longitude,
+    hotelLatType: typeof hotel.latitude,
+    hotelLngType: typeof hotel.longitude,
+    hasReference: !!referenceCoordinates,
+    hasHotelCoords: !!(hotel.latitude && hotel.longitude),
+    hotelLatTruthy: !!hotel.latitude,
+    hotelLngTruthy: !!hotel.longitude,
+    hotelObject: hotel
+  });
 
   const [availableRooms, setAvailableRooms] = useState<RoomType[]>([]);
   const [isFetchingRates, setIsFetchingRates] = useState(false);
@@ -342,6 +415,7 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
           {hotel.city && (
             <p className="text-gray-200 text-lg mt-1">{hotel.city}</p>
           )}
+
           <div className="mt-2">
             {(() => {
               const starsFromUrl = starsFromQuery ? parseInt(starsFromQuery, 10) : 0;
