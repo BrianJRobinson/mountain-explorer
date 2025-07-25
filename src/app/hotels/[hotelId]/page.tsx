@@ -34,11 +34,75 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c; // Distance in kilometers
 };
 
-// Format distance based on locale (km for metric, miles for imperial)
-const formatDistance = (distanceKm: number): string => {
-  // Use navigator.language to detect locale, default to metric for most of the world
-  const locale = typeof navigator !== 'undefined' ? navigator.language : 'en-GB';
-  const useImperial = locale.startsWith('en-US'); // Only US uses miles primarily
+// Detect user's country/region using multiple methods
+const detectUserRegion = async (): Promise<string> => {
+  // Check localStorage cache first
+  const cached = typeof localStorage !== 'undefined' ? localStorage.getItem('user-region') : null;
+  if (cached) {
+    console.log('Using cached region:', cached);
+    return cached;
+  }
+
+  let detectedRegion = 'UNKNOWN';
+
+  try {
+    // Method 1: IP Geolocation (most accurate for actual location)
+    console.log('Trying IP geolocation first...');
+    try {
+      const response = await fetch('https://ipapi.co/json/', { 
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('IP geolocation data:', data);
+        if (data.country_code) {
+          detectedRegion = data.country_code.toUpperCase();
+          console.log('Using IP geolocation region:', detectedRegion);
+        }
+      }
+    } catch (ipError) {
+      console.warn('IP geolocation failed:', ipError);
+    }
+
+    // Method 2: Browser language fallback (if IP geolocation fails)
+    if (detectedRegion === 'UNKNOWN' && typeof navigator !== 'undefined' && navigator.language) {
+      console.log('Falling back to browser locale...');
+      const locale = navigator.language;
+      console.log('Browser locale:', locale);
+      
+      // Extract country code from locale (e.g., en-AU -> AU)
+      if (locale.includes('-')) {
+        const countryCode = locale.split('-')[1].toUpperCase();
+        console.log('Country from locale:', countryCode);
+        detectedRegion = countryCode;
+      }
+    }
+
+    // Cache the result for 24 hours
+    if (typeof localStorage !== 'undefined' && detectedRegion !== 'UNKNOWN') {
+      localStorage.setItem('user-region', detectedRegion);
+      localStorage.setItem('user-region-timestamp', Date.now().toString());
+    }
+
+  } catch (error) {
+    console.error('Region detection error:', error);
+  }
+
+  console.log('Final detected region:', detectedRegion);
+  return detectedRegion;
+};
+
+// Format distance based on detected user region
+const formatDistance = async (distanceKm: number): Promise<string> => {
+  const region = await detectUserRegion();
+  
+  // Countries that primarily use miles (Imperial system)
+  const imperialCountries = ['US', 'LR', 'MM']; // USA, Liberia, Myanmar
+  // UK uses miles for distance but km for shorter measurements - we'll use miles for consistency
+  const ukCountries = ['GB', 'UK'];
+  
+  const useImperial = imperialCountries.includes(region) || ukCountries.includes(region);
   
   if (useImperial) {
     const distanceMiles = distanceKm * 0.621371; // Convert km to miles
@@ -46,6 +110,55 @@ const formatDistance = (distanceKm: number): string => {
   } else {
     return `Within ${distanceKm.toFixed(1)} km`;
   }
+};
+
+// Get default currency based on detected region
+const getDefaultCurrency = async (): Promise<string> => {
+  const region = await detectUserRegion();
+  
+  // Map regions to their primary currencies
+  const currencyMap: { [key: string]: string } = {
+    'AU': 'AUD', // Australia
+    'US': 'USD', // United States
+    'GB': 'GBP', // United Kingdom
+    'UK': 'GBP', // United Kingdom (alternative code)
+    'CA': 'CAD', // Canada
+    'JP': 'JPY', // Japan
+    'NZ': 'NZD', // New Zealand
+    'SG': 'SGD', // Singapore
+    'HK': 'HKD', // Hong Kong
+    'CH': 'CHF', // Switzerland
+    'NO': 'NOK', // Norway
+    'SE': 'SEK', // Sweden
+    'DK': 'DKK', // Denmark
+    // Eurozone countries
+    'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR', 'ES': 'EUR', 'NL': 'EUR',
+    'BE': 'EUR', 'AT': 'EUR', 'PT': 'EUR', 'IE': 'EUR', 'FI': 'EUR',
+    'GR': 'EUR', 'LU': 'EUR', 'SI': 'EUR', 'SK': 'EUR', 'EE': 'EUR',
+    'LV': 'EUR', 'LT': 'EUR', 'CY': 'EUR', 'MT': 'EUR'
+  };
+  
+  const defaultCurrency = currencyMap[region] || 'USD'; // Fallback to USD
+  console.log(`Setting default currency for region ${region}: ${defaultCurrency}`);
+  return defaultCurrency;
+};
+
+// React component to handle async distance formatting
+const DistanceDisplay: React.FC<{ 
+  distanceKm: number; 
+  className?: string; 
+}> = ({ distanceKm, className = "" }) => {
+  const [formattedDistance, setFormattedDistance] = useState<string>('Calculating...');
+
+  useEffect(() => {
+    formatDistance(distanceKm).then(setFormattedDistance);
+  }, [distanceKm]);
+
+  return (
+    <span className={className}>
+      📍 {formattedDistance}
+    </span>
+  );
 };
 
 // --- Nearby Hotels Sidebar Component ---
@@ -85,12 +198,14 @@ const NearbyHotels: React.FC<{
               {/* Distance display for each nearby hotel */}
               {referenceCoordinates && nearbyHotel.latitude && nearbyHotel.longitude && (
                 <p className="text-orange-400 text-xs mt-1 font-medium">
-                  📍 {formatDistance(calculateDistance(
-                    referenceCoordinates.lat,
-                    referenceCoordinates.lng,
-                    nearbyHotel.latitude,
-                    nearbyHotel.longitude
-                  ))}
+                  <DistanceDisplay 
+                    distanceKm={calculateDistance(
+                      referenceCoordinates.lat,
+                      referenceCoordinates.lng,
+                      nearbyHotel.latitude,
+                      nearbyHotel.longitude
+                    )}
+                  />
                 </p>
               )}
               <div className="mt-2 pt-2 border-t border-gray-100">
@@ -219,20 +334,25 @@ function HotelDetailsContent({
 
 
   useEffect(() => {
-    // This logic runs on the client-side after the component mounts.
-    try {
-      const userLocale = navigator.language; // e.g., 'en-AU', 'en-US', 'de-DE'
-      const countryCode = userLocale.includes('-') ? userLocale.split('-')[1].toUpperCase() : 'US';
-      const browserCurrency = new Intl.NumberFormat(userLocale).resolvedOptions().currency || 'USD';
-
-      setGuestNationality(countryCode);
-      setCurrency(browserCurrency);
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (e) {
-      console.warn("Could not determine user's locale, defaulting to USD/US.");
-      // Default values are already set, so we just log the warning.
-    }
+    // Use hybrid region detection to set currency and nationality
+    const initializeLocaleSettings = async () => {
+      try {
+        const detectedRegion = await detectUserRegion();
+        const defaultCurrency = await getDefaultCurrency();
+        
+        console.log('Initializing locale settings:', { detectedRegion, defaultCurrency });
+        
+        setGuestNationality(detectedRegion);
+        setCurrency(defaultCurrency);
+        
+      } catch (error) {
+        console.warn("Could not determine user's region, defaulting to USD/US:", error);
+        setGuestNationality('US');
+        setCurrency('USD');
+      }
+    };
+    
+    initializeLocaleSettings();
   }, []);
 
   const handleCurrencyChange = (newCurrency: string) => {
@@ -470,32 +590,104 @@ function HotelDetailsContent({
           <div className="bg-gray-800 p-6 rounded-lg sticky top-8">
             <h2 className="text-2xl font-bold text-white mb-4">Book Your Stay</h2>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Check-in</label>
-                <input type="date" value={selectedDate.checkIn} min={getTodayDate()} onChange={e => setSelectedDate(p => ({ ...p, checkIn: e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500" />
+              <div className="relative w-full group">
+                <label className="block text-sm font-medium text-gray-400 mb-1 ">Check-in</label>
+                <input type="date" value={selectedDate.checkIn} min={getTodayDate()} onChange={e => setSelectedDate(p => ({ ...p, checkIn: e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500 border border-gray-600 group-hover:bg-gray-600 transition-colors duration-150" />
               </div>
-              <div>
+              <div className="relative w-full group">
                 <label className="block text-sm font-medium text-gray-400 mb-1">Check-out</label>
-                <input type="date" value={selectedDate.checkOut} min={selectedDate.checkIn} onChange={e => setSelectedDate(p => ({ ...p, checkOut: e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500" />
+                <input type="date" value={selectedDate.checkOut} min={selectedDate.checkIn} onChange={e => setSelectedDate(p => ({ ...p, checkOut: e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500 border border-gray-600 group-hover:bg-gray-600 transition-colors duration-150" />
               </div>
-              <div>
+              <div className="relative w-full group">
                 <label className="block text-sm font-medium text-gray-400 mb-1">Adults</label>
-                <select value={guests.adults} onChange={e => setGuests(p => ({ ...p, adults: +e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500">
-                  {[1, 2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}</option>)}
+                <select
+                  value={guests.adults}
+                  onChange={(e) => setGuests((p) => ({ ...p, adults: +e.target.value }))}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 pr-10 text-white focus:ring-orange-500 focus:border-orange-500 appearance-none group-hover:bg-gray-600 transition-colors duration-150"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
                 </select>
+
+                {/* Custom Arrow Icon */}
+                <div
+                  className="pointer-events-none absolute right-3 transform -translate-y-1/2 flex items-center"
+                  style={{ top: 'calc(70%)' }}
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-400 group-hover:text-gray-200 transition-colors duration-150"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
               </div>
-              <div>
+              <div className="relative w-full group">
                 <label className="block text-sm font-medium text-gray-400 mb-1">Children</label>
-                <select value={guests.children} onChange={e => setGuests(p => ({ ...p, children: +e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500">
-                  {[0, 1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
+                <select
+                  value={guests.children}
+                  onChange={(e) => setGuests(p => ({ ...p, children: +e.target.value }))}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 pr-10 text-white focus:ring-orange-500 focus:border-orange-500 appearance-none group-hover:bg-gray-600 transition-colors duration-150"
+                >
+                  {[0, 1, 2, 3, 4].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-1">Currency</label>
-                <select value={currency} onChange={e => handleCurrencyChange(e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500">
-                  {['USD', 'AUD', 'EUR', 'GBP', 'CAD', 'JPY'].map(c => <option key={c} value={c}>{c}</option>)}
+
+                {/* Custom Arrow Icon */}
+                <div
+                  className="pointer-events-none absolute right-3 transform -translate-y-1/2 flex items-center"
+                  style={{ top: 'calc(70%)' }}
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-400 group-hover:text-gray-200 transition-colors duration-150"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>              
+              <div className="relative w-full group">
+                <label className="block text-sm font-medium text-gray-400 mb-1">Children</label>
+                <select
+                  value={currency}
+                  onChange={(e) => handleCurrencyChange(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md p-2 pr-10 text-white focus:ring-orange-500 focus:border-orange-500 appearance-none group group-hover:bg-gray-600 transition-colors duration-150"
+                >
+                  {['USD', 'AUD', 'EUR', 'GBP', 'CAD', 'JPY'].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
                 </select>
-              </div>
+
+                {/* Custom Arrow Icon */}
+                <div
+                  className="pointer-events-none absolute right-3 transform -translate-y-1/2 flex items-center"
+                  style={{ top: 'calc(70%)' }}
+                >
+                  <svg
+                    className="w-4 h-4 text-gray-400 group-hover:text-gray-200 transition-colors duration-150"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>                
               <button onClick={handleCheckAvailability} disabled={isFetchingRates} className="w-full py-3 mt-2 rounded-md font-bold text-white transition-colors disabled:bg-gray-600 bg-orange-600 hover:bg-orange-700">
                 {isFetchingRates ? 'Checking...' : 'Check Availability'}
               </button>
