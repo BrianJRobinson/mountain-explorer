@@ -4,7 +4,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { hotelId: string } }
 ) {
-  const hotelId = params.hotelId;
+  const { hotelId } = await params;
   
   console.log(`[API] Hotel details request for hotelId=${hotelId}`);
   
@@ -97,7 +97,7 @@ export async function GET(
   }
   
   try {
-    // Call the LiteAPI hotel details endpoint
+    // Reverted to v3.0 endpoint to fix 500 error, will rely on data merging for stars
     const apiUrl = `https://api.liteapi.travel/v3.0/data/hotel?hotelId=${hotelId}`;
     
     console.log(`[API] Fetching hotel details from LiteAPI...`);

@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useHotelDetails, HotelDetails, useHotelsNearby, Hotel } from '@/lib/hotelService';
+import { HotelDetails, RoomType, useHotelDetails, useHotelsNearby, Hotel } from '@/lib/hotelService';
+import StarRating from '@/components/StarRating';
+import HotelImageGallery from '@/components/Hotel/HotelImageGallery';
 import styles from './HotelDetails.module.css';
 
 // --- Helper Functions ---
@@ -30,11 +32,11 @@ const NearbyHotels: React.FC<{ hotels: Hotel[] | undefined, loading: boolean, er
 
   return (
     <div className="mt-12">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Nearby Hotels</h2>
+      <h2 className="text-3xl font-bold text-orange-600 mb-6">Nearby Hotels</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
         {displayedHotels.map(nearbyHotel => (
           <Link 
-            href={`/hotels/${nearbyHotel.id}?lat=${nearbyHotel.latitude}&lng=${nearbyHotel.longitude}`} 
+            href={`/hotels/${nearbyHotel.id}?lat=${nearbyHotel.latitude}&lng=${nearbyHotel.longitude}&stars=${nearbyHotel.starRating || 0}`} 
             key={nearbyHotel.id} 
             className="block border rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 ease-in-out"
           >
@@ -44,16 +46,16 @@ const NearbyHotels: React.FC<{ hotels: Hotel[] | undefined, loading: boolean, er
               className="w-full h-32 object-cover"
             />
             <div className="p-3 flex flex-col flex-grow">
-              <h3 className="font-semibold text-md text-gray-800 truncate" title={nearbyHotel.name}>{nearbyHotel.name}</h3>
+              <h3 className="font-semibold text-md text-orange-600 truncate" title={nearbyHotel.name}>{nearbyHotel.name}</h3>
               <p className="text-sm text-gray-500 flex-grow">{nearbyHotel.city}</p>
-              <div className="mt-2 flex justify-between items-center text-sm pt-2 border-t border-gray-100">
+              <div className="mt-2 pt-2 border-t border-gray-100">
                 {(nearbyHotel.starRating ?? 0) > 0 && (
-                  <div className="text-yellow-500">
+                  <div className="text-yellow-500 flex items-center text-sm">
                     {'★'.repeat(Math.floor(nearbyHotel.starRating ?? 0))}
                   </div>
                 )}
-                {(nearbyHotel.rating ?? 0) > 0 && (
-                  <div className="text-blue-600 font-bold ml-auto pl-2">
+                {(nearbyHotel.rating ?? 0) > 0 && ( 
+                  <div className="text-blue-600 font-bold text-sm mt-1">
                     {(nearbyHotel.rating ?? 0).toFixed(1)}
                   </div>
                 )}
@@ -71,12 +73,13 @@ export default function HotelDetailsPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const hotelId = params.hotelId as string;
+  const starsFromQuery = searchParams.get('stars');
+
+  const { hotel, loading, error } = useHotelDetails(hotelId);
 
   // Get lat/lng from URL params as a fallback
   const urlLat = searchParams.get('lat');
   const urlLng = searchParams.get('lng');
-
-  const { hotel, loading, error } = useHotelDetails(hotelId);
 
   // Prioritize URL coordinates, then fall back to fetched hotel coordinates
   const latitude = urlLat ? parseFloat(urlLat) : hotel?.latitude;
@@ -87,29 +90,21 @@ export default function HotelDetailsPage() {
     latitude ?? 0,
     longitude ?? 0,
     10000, // 10km radius
-    // Enable if we have coordinates from either URL or fetched data
-    hasValidCoordinates,
+    // Enable only when not loading and we have coordinates from either URL or fetched data
+    !loading && hasValidCoordinates,
     hotelId
   );
 
+  if (!hotelId) return <ErrorState error={{ name: 'Error', message: 'Hotel ID is missing.' }} />;
   if (loading) return <LoadingState />;
   if (error || !hotel) return <ErrorState error={error} />;
 
   return (
     <div className="min-h-screen bg-[#0b1120] text-gray-300">
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <Link href="/" className="inline-flex items-center text-orange-400 hover:text-orange-300 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-            Back to Map
-          </Link>
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* --- Main Hotel Details --- */}
-          <HotelDetailsContent hotel={hotel} />
+          <HotelDetailsContent hotel={hotel} starsFromQuery={starsFromQuery} />
 
           {/* --- Nearby Hotels Section --- */}
           <div className="mt-12">
@@ -117,8 +112,8 @@ export default function HotelDetailsPage() {
               <NearbyHotels hotels={nearbyHotels} loading={nearbyLoading} error={nearbyError} />
             ) : (
               <div>
-                <h2 className="text-3xl font-bold text-gray-800 mb-6">Nearby Hotels</h2>
-                <p className="text-gray-600">Location data is not available for this hotel, so we cannot show nearby hotels.</p>
+                <h2 className="text-3xl font-bold text-orange-600 mb-6">Nearby Hotels</h2>
+                <p className="text-orange-600">Location data is not available for this hotel, so we cannot show nearby hotels.</p>
               </div>
             )}
           </div>
@@ -130,13 +125,143 @@ export default function HotelDetailsPage() {
 
 // --- Child Components ---
 
-function HotelDetailsContent({ hotel }: { hotel: HotelDetails }) {
+function formatCurrency(amount: number, currency: string) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+}
+
+function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; starsFromQuery: string | null }) {
   const [selectedDate, setSelectedDate] = useState({ checkIn: getTomorrowDate(), checkOut: getDayAfterTomorrowDate() });
   const [guests, setGuests] = useState({ adults: 2, children: 0 });
-  const [selectedRoom, setSelectedRoom] = useState<string | null>(null);
 
-  const handleBookNow = () => {
-    alert(`Booking for ${hotel.name} from ${selectedDate.checkIn} to ${selectedDate.checkOut}`);
+  const [availableRooms, setAvailableRooms] = useState<RoomType[]>([]);
+  const [isFetchingRates, setIsFetchingRates] = useState(false);
+  const [ratesError, setRatesError] = useState<string | null>(null);
+  const [hasSearchedRates, setHasSearchedRates] = useState(false);
+  const [lowestPrice, setLowestPrice] = useState<number | null>(null);
+  const [currency, setCurrency] = useState('USD');
+  const [guestNationality, setGuestNationality] = useState('US');
+
+
+  useEffect(() => {
+    // This logic runs on the client-side after the component mounts.
+    try {
+      const userLocale = navigator.language; // e.g., 'en-AU', 'en-US', 'de-DE'
+      const countryCode = userLocale.includes('-') ? userLocale.split('-')[1].toUpperCase() : 'US';
+      const browserCurrency = new Intl.NumberFormat(userLocale).resolvedOptions().currency || 'USD';
+
+      setGuestNationality(countryCode);
+      setCurrency(browserCurrency);
+
+    } catch (e) {
+      console.warn("Could not determine user's locale, defaulting to USD/US.");
+      // Default values are already set, so we just log the warning.
+    }
+  }, []);
+
+  const handleCurrencyChange = (newCurrency: string) => {
+    setCurrency(newCurrency);
+    // Reset availability when currency changes, to force a new search
+    setAvailableRooms([]);
+    setLowestPrice(null);
+    setHasSearchedRates(false);
+    setRatesError(null);
+  };
+
+  const handleCheckAvailability = async () => {
+    setHasSearchedRates(true);
+    if (!hotel) return;
+
+    setIsFetchingRates(true);
+    setRatesError(null);
+
+    try {
+      const response = await fetch(`/api/hotels/${hotel.id}/rates`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            checkin: selectedDate.checkIn,
+            checkout: selectedDate.checkOut,
+            adults: guests.adults,
+            children: guests.children,
+            currency,
+            guestNationality,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch room rates.');
+      }
+
+      const data = await response.json();
+      const rooms = data.availableRooms || [];
+      setAvailableRooms(rooms);
+
+      if (rooms.length > 0) {
+        const prices = rooms
+          .map((room: RoomType) => room.price)
+          .filter((price: number | undefined): price is number => typeof price === 'number');
+        
+        if (prices.length > 0) {
+          setLowestPrice(Math.min(...prices));
+        } else {
+          setLowestPrice(null);
+        }
+      } else {
+        setLowestPrice(null);
+      }
+
+    } catch (error) {
+      setRatesError(error instanceof Error ? error.message : 'An unknown error occurred.');
+    } finally {
+      setIsFetchingRates(false);
+    }
+  };
+
+
+
+  const handleBookNowClick = () => {
+    if (!hotel || !selectedDate.checkIn || !selectedDate.checkOut) return;
+
+    const whitelabelBaseUrl = process.env.NEXT_PUBLIC_LITEAPI_WHITELABEL_URL;
+
+    if (!whitelabelBaseUrl) {
+      console.error('LiteAPI Whitelabel URL is not configured.');
+      setRatesError('Booking service is not configured. Please contact support.');
+      return;
+    }
+
+    const occupancies = [
+      {
+        adults: guests.adults,
+        children: guests.children > 0 ? Array.from({ length: guests.children }, () => 10) : [], // Assuming age 10 for children as a placeholder
+      },
+    ];
+    const encodedOccupancies = btoa(JSON.stringify(occupancies));
+
+    const params = new URLSearchParams({
+      checkin: selectedDate.checkIn,
+      checkout: selectedDate.checkOut,
+      rooms: '1',
+      adults: guests.adults.toString(),
+      children: guests.children.toString(),
+      name: hotel.name,
+      occupancies: encodedOccupancies,
+      language: 'en',
+      currency: currency,
+    });
+
+    // Ensure the base URL has a protocol, otherwise it's treated as a relative path.
+    let fullWhitelabelUrl = whitelabelBaseUrl;
+    if (!/^https?:\/\//i.test(fullWhitelabelUrl)) {
+      fullWhitelabelUrl = `https://` + fullWhitelabelUrl;
+    }
+
+    const finalUrl = `${fullWhitelabelUrl}/hotels/${hotel.id}?${params.toString()}`;
+
+    window.open(finalUrl, '_blank');
   };
 
   return (
@@ -151,9 +276,24 @@ function HotelDetailsContent({ hotel }: { hotel: HotelDetails }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <h1 className="text-white text-4xl font-bold">{hotel.name}</h1>
-          <div className="flex items-center mt-2">
-            {hotel.starRating && <div className="text-yellow-400 text-xl">{'★'.repeat(hotel.starRating)}</div>}
-            {hotel.rating && <div className="ml-4 bg-blue-500 text-white px-2 py-1 rounded text-sm font-bold">{hotel.rating.toFixed(1)}/10</div>}
+          <div className="mt-2">
+            {(() => {
+              const starsFromUrl = starsFromQuery ? parseInt(starsFromQuery, 10) : 0;
+              const displayStars = starsFromUrl > 0 ? starsFromUrl : (hotel.starRating ?? 0);
+
+              return displayStars > 0 ? (
+                <div className="text-yellow-400 flex items-center text-lg">
+                  {'★'.repeat(displayStars)}
+                </div>
+              ) : null;
+            })()}
+            {(hotel.rating ?? 0) > 0 && (
+              <div className="mt-1">
+                <div className="bg-blue-500 text-white px-2 py-1 rounded text-sm font-bold inline-block">
+                  {hotel.rating?.toFixed(1)}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -161,6 +301,9 @@ function HotelDetailsContent({ hotel }: { hotel: HotelDetails }) {
       {/* Main Details & Booking Form Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-8">
+          {/* Image Gallery */}
+          <HotelImageGallery images={hotel.images || []} />
+
           {/* About Section */}
           <div className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-2xl font-bold text-white mb-4">About this hotel</h2>
@@ -175,28 +318,6 @@ function HotelDetailsContent({ hotel }: { hotel: HotelDetails }) {
                 {hotel.amenities.map((amenity, i) => <div key={i} className="flex items-center"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>{amenity}</div>)}
               </div>
             ) : <p className="text-gray-500">No amenities information available.</p>}
-          </div>
-
-          {/* Rooms Section */}
-          <div className="bg-gray-800 p-6 rounded-lg">
-            <h2 className="text-2xl font-bold text-white mb-4">Available Rooms</h2>
-            <div className="space-y-4">
-              {hotel.roomTypes?.map(room => (
-                <div key={room.id} className={`p-4 rounded-lg border-2 ${selectedRoom === room.id ? 'border-orange-500 bg-gray-700' : 'border-gray-700 hover:border-orange-500/50'}`} onClick={() => setSelectedRoom(room.id)}>
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    {room.images?.[0] && <img src={room.images[0]} alt={room.name} className="w-full sm:w-48 h-32 object-cover rounded" />}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white">{room.name}</h3>
-                      <p className="text-gray-400 mt-1">{room.description}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="text-lg font-bold text-orange-400">{room.price ? `${room.currency || '£'}${room.price}` : 'Price not available'}</div>
-                        <div className="text-sm text-gray-400">Max Guests: {room.maxOccupancy}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -225,9 +346,37 @@ function HotelDetailsContent({ hotel }: { hotel: HotelDetails }) {
                   {[0, 1, 2, 3, 4].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
-              <button onClick={handleBookNow} disabled={!selectedRoom} className="w-full py-3 mt-4 rounded-md font-bold text-white transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed bg-orange-600 hover:bg-orange-500">
-                {selectedRoom ? 'Book Now' : 'Select a Room'}
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Currency</label>
+                <select value={currency} onChange={e => handleCurrencyChange(e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500">
+                  {['USD', 'AUD', 'EUR', 'GBP', 'CAD', 'JPY'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <button onClick={handleCheckAvailability} disabled={isFetchingRates} className="w-full py-3 mt-2 rounded-md font-bold text-white transition-colors disabled:bg-gray-600 bg-orange-600 hover:bg-orange-700">
+                {isFetchingRates ? 'Checking...' : 'Check Availability'}
               </button>
+
+              {ratesError && <p className="text-red-400 text-sm mt-2">Error: {ratesError}</p>}
+
+              {hasSearchedRates && !isFetchingRates && availableRooms.length === 0 && !ratesError && (
+                <div className="mt-4 p-4 bg-yellow-900/50 border border-yellow-500 rounded-lg text-center">
+                  <p className="text-yellow-200">No rooms available for the selected dates. Please try different dates.</p>
+                </div>
+              )}
+
+              {hasSearchedRates && !isFetchingRates && availableRooms.length > 0 && (
+                <div className="mt-6 text-center">
+                  <p className="text-lg font-semibold text-orange-400">
+                    Good news! Rooms available
+                    {lowestPrice !== null && ` from ${formatCurrency(lowestPrice, currency)} (${currency})`}
+                  </p>
+                  <button 
+                    onClick={handleBookNowClick} 
+                    className="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition duration-300 ease-in-out transform hover:scale-105">
+                    Book Now on Partner Site
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

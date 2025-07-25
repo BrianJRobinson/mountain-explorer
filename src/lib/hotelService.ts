@@ -1,5 +1,68 @@
 import { useEffect, useState } from 'react';
 
+// --- Helper Functions ---
+
+/**
+ * Deduplicates and merges a list of hotels. When duplicates are found (by ID),
+ * it merges their properties, prioritizing non-empty/non-zero values.
+ * @param hotels The raw array of hotels from the API.
+ * @returns A clean, deduplicated array of hotels.
+ */
+/**
+ * Calculates a "completeness" score for a hotel object.
+ * The higher the score, the more complete the data.
+ * @param hotel The hotel object.
+ * @returns A numeric score.
+ */
+function calculateCompletenessScore(hotel: Hotel): number {
+  let score = 0;
+  if (hotel.description && hotel.description.length > 20) score += 2;
+  if (hotel.thumbnail && hotel.thumbnail.length > 0) score += 2;
+  if (hotel.images && hotel.images.length > 0) score += 1;
+  if (hotel.starRating && hotel.starRating > 0) score += hotel.starRating;
+  if (hotel.rating && hotel.rating > 0) score += 1;
+  if (hotel.address && hotel.address.length > 0) score += 1;
+  return score;
+}
+
+/**
+ * Deduplicates and merges a list of hotels. When duplicates are found (by name and location),
+ * it merges their properties, keeping the ID of the record deemed more "complete".
+ * @param hotels The raw array of hotels from the API.
+ * @returns A clean, deduplicated array of hotels.
+ */
+function deduplicateAndMergeHotels(hotels: Hotel[]): Hotel[] {
+  const hotelMap = new Map<string, Hotel>();
+
+  hotels.forEach(hotel => {
+    const locationKey = `${hotel.name.toLowerCase().trim()}|${hotel.latitude.toFixed(3)}|${hotel.longitude.toFixed(3)}`;
+    const existingHotel = hotelMap.get(locationKey);
+
+    if (existingHotel) {
+      const existingScore = calculateCompletenessScore(existingHotel);
+      const newScore = calculateCompletenessScore(hotel);
+
+      const winner = newScore > existingScore ? hotel : existingHotel;
+      const loser = newScore > existingScore ? existingHotel : hotel;
+
+      const mergedHotel: Hotel = { ...winner };
+
+      // Fill in any gaps in the winner's data using the loser's data.
+      (Object.keys(loser) as Array<keyof Hotel>).forEach(key => {
+        if (mergedHotel[key] === null || mergedHotel[key] === undefined || (typeof mergedHotel[key] === 'number' && mergedHotel[key] === 0)) {
+          (mergedHotel as any)[key] = loser[key];
+        }
+      });
+
+      hotelMap.set(locationKey, mergedHotel);
+    } else {
+      hotelMap.set(locationKey, hotel);
+    }
+  });
+
+  return Array.from(hotelMap.values());
+}
+
 export interface Hotel {
   id: string;
   name: string;
@@ -18,6 +81,18 @@ export interface Hotel {
   thumbnail?: string;
 }
 
+export interface RoomType {
+  id: string;
+  offerId: string;
+  name: string;
+  description?: string;
+  maxOccupancy: number;
+  price?: number;
+  currency?: string;
+  images?: string[];
+  rates?: any[];
+}
+
 export interface HotelDetails extends Hotel {
   // Additional fields for detailed hotel view
   amenities?: string[];
@@ -28,16 +103,6 @@ export interface HotelDetails extends Hotel {
   website?: string;
   roomTypes?: RoomType[];
   reviews?: Review[];
-}
-
-export interface RoomType {
-  id: string;
-  name: string;
-  description?: string;
-  maxOccupancy: number;
-  price?: number;
-  currency?: string;
-  images?: string[];
 }
 
 export interface Review {
@@ -92,9 +157,10 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
       responsePreview: JSON.stringify(data).substring(0, 200) + '...'
     });
     
-    const hotels = data.hotels || [];
+    const rawHotels = data.hotels || [];
+    const mergedHotels = deduplicateAndMergeHotels(rawHotels);
 
-    const filteredHotels = excludeHotelId ? hotels.filter((h: Hotel) => h.id !== excludeHotelId) : hotels;
+    const filteredHotels = excludeHotelId ? mergedHotels.filter((h: Hotel) => h.id !== excludeHotelId) : mergedHotels;
     
     // Cache the results
     hotelCache.set(cacheKey, { data: filteredHotels, timestamp: Date.now() });

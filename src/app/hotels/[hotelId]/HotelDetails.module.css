@@ -8,3 +8,33 @@
   margin-bottom: 1rem;
 }
 
+/* Hotel Image Gallery */
+.imageGalleryContainer {
+  display: none; /* Hidden by default on small screens */
+}
+
+.imageGallery {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem; /* Space between gallery and 'About' section */
+}
+
+.galleryItem {
+  overflow: hidden;
+  border-radius: 0.5rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.galleryItem:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Show the gallery on medium screens and up (768px) */
+@media (min-width: 768px) {
+  .imageGalleryContainer {
+    display: block;
+  }
+}
+

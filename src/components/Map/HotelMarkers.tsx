@@ -1,16 +1,26 @@
 import React, { useState, useEffect, useRef, useReducer } from 'react';
 
 // Helper function to render star ratings
-const renderStars = (starCount: number): string => {
-  if (!starCount || starCount <= 0) return '';
-  let stars = '';
-  const filledStar = `<svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>`;
-  const emptyStar = `<svg class="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>`;
-  
-  for (let i = 0; i < 5; i++) {
-    stars += i < starCount ? filledStar : emptyStar;
+const renderStars = (starCount: number, numericRating?: number): string => {
+  let starsHtml = '';
+  if (starCount > 0) {
+    const filledStar = `<svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>`;
+    const emptyStar = `<svg class="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>`;
+    for (let i = 0; i < 5; i++) {
+      starsHtml += i < starCount ? filledStar : emptyStar;
+    }
   }
-  return `<div class="flex items-center">${stars}</div>`;
+
+  let ratingHtml = '';
+  if (numericRating && numericRating > 0) {
+    ratingHtml = `<span class="text-sm font-bold text-blue-600 ml-2">${numericRating.toFixed(1)}</span>`;
+  }
+
+  if (!starsHtml && !ratingHtml) {
+    return ''; // Return nothing if there's nothing to show
+  }
+
+  return `<div class="flex items-center">${starsHtml}${ratingHtml}</div>`;
 };
 import { Marker } from 'maplibre-gl';
 import L from 'leaflet';
@@ -293,19 +303,15 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
               iconAnchor: [12, 12],
             }),
           }).bindPopup(() => {
-            const starsHTML = renderStars(hotel.starRating || 0);
-            const ratingHTML = hotel.rating ? `<div class="text-sm text-gray-600"><strong>${hotel.rating}</strong>/10 User Rating</div>` : '';
-
             return (
               `<div class="w-64 font-sans">
                 ${hotel.thumbnail ? `<img src="${hotel.thumbnail}" alt="${hotel.name}" class="w-full h-32 object-cover rounded-t-lg" />` : ''}
                 <div class="p-3">
                   <h3 class="text-lg font-bold text-gray-900 truncate">${hotel.name}</h3>
-                  <div class="flex items-center justify-between mt-2">
-                    ${starsHTML}
-                    ${ratingHTML}
+                  <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                    ${renderStars(hotel.starRating || 0, hotel.rating || 0)}
                   </div>
-                  <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}" target="_blank" rel="noopener noreferrer" class="mt-4 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white font-semibold py-2 px-4 rounded-md transition-colors no-underline">
+                  <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}&stars=${hotel.starRating || 0}" target="_blank" rel="noopener noreferrer" class="mt-4 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white font-semibold py-2 px-4 rounded-md transition-colors no-underline">
                     View Details
                   </a>
                 </div>
