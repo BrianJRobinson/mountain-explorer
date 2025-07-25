@@ -150,6 +150,7 @@ export async function GET(
         images: (() => {
           // Handle hotelImages array from LiteAPI (objects with url/urlHd)
           if (apiHotel.hotelImages && Array.isArray(apiHotel.hotelImages)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return apiHotel.hotelImages.map((img: any) => {
               if (typeof img === 'object' && img !== null) {
                 // Prefer HD version if available, fallback to regular URL
