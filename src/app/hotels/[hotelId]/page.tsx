@@ -299,6 +299,7 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
 
     // Add city/location parameters in multiple formats
     if (hotel.city) {
+      params.set('name', hotel.city); // Primary location name parameter
       params.set('city', hotel.city);
       params.set('location', hotel.city);
       params.set('destination', hotel.city);
