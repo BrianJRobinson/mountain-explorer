@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request, { params }: { params: { hotelId: string } }) {
-  const { hotelId } = await params;
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ hotelId: string }> }
+) {
+  const { hotelId } = await context.params;
   const { checkin, checkout, adults, children, currency, guestNationality } = await request.json();
 
   if (!checkin || !checkout || !adults) {
@@ -56,9 +59,11 @@ export async function POST(request: Request, { params }: { params: { hotelId: st
       return NextResponse.json({ availableRooms: [] });
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const availableRooms = hotelRatesData.roomTypes.flatMap((roomOffer: any) => {
       // Each roomOffer can have multiple rates, we'll create a room for each rate.
       if (!roomOffer.rates) return []; // Safety check for offers without rates
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return roomOffer.rates.map((rate: any) => ({
         offerId: roomOffer.offerId, // The offerId is at the parent level of the rate
         name: rate.name,

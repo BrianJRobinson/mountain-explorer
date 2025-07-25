@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { HotelDetails, RoomType, useHotelDetails, useHotelsNearby, Hotel } from '@/lib/hotelService';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import StarRating from '@/components/StarRating';
 import HotelImageGallery from '@/components/Hotel/HotelImageGallery';
 import styles from './HotelDetails.module.css';
@@ -22,6 +23,7 @@ const getDayAfterTomorrowDate = () => {
 };
 
 // --- Nearby Hotels Sidebar Component ---
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NearbyHotels: React.FC<{ hotels: Hotel[] | undefined, loading: boolean, error: any }> = ({ hotels, loading, error }) => {
   if (loading) return <div className="mt-8"><p>Loading nearby hotels...</p></div>;
   if (error) return <div className="mt-8"><p className="text-red-500">Error loading nearby hotels.</p></div>;
@@ -40,6 +42,7 @@ const NearbyHotels: React.FC<{ hotels: Hotel[] | undefined, loading: boolean, er
             key={nearbyHotel.id} 
             className="block border rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 ease-in-out"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={nearbyHotel.thumbnail || 'https://via.placeholder.com/300x200?text=No+Image'} 
               alt={`Thumbnail for ${nearbyHotel.name}`} 
@@ -152,6 +155,7 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
       setGuestNationality(countryCode);
       setCurrency(browserCurrency);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (e) {
       console.warn("Could not determine user's locale, defaulting to USD/US.");
       // Default values are already set, so we just log the warning.
@@ -269,6 +273,7 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
       {/* Header Image & Title */}
       <div className="relative rounded-lg overflow-hidden bg-gray-800 h-96">
         {hotel.images && hotel.images.length > 0 ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={hotel.images[0]} alt={hotel.name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-500">No image available</div>

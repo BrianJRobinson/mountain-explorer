@@ -29,7 +29,6 @@ interface MountainCardProps {
 // Dynamic imports for mapping libraries
 // @ts-expect-error - These libraries do work at runtime despite the type error
 let L: typeof import('leaflet')['default'] | undefined;
-// @ts-expect-error - These libraries do work at runtime despite the type error
 let maplibregl: typeof import('maplibre-gl')['default'] | undefined;
 
 // Load libraries on mount
@@ -229,18 +228,21 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         // Append button to popup content
         popupContent.appendChild(button);
 
-        const popup = new maplibregl.Popup({ offset: 25 })
-          .setDOMContent(popupContent);
+        if (maplibregl && maplibreMap.current) {
+          const popup = new maplibregl.Popup({ offset: 25 })
+            .setDOMContent(popupContent);
 
-        const marker = new maplibregl.Marker(el)
-          .setLngLat([mLng, mLat])
-          .setPopup(popup)
-          .addTo(maplibreMap.current);
+          const marker = new maplibregl.Marker(el)
+            .setLngLat([mLng, mLat])
+            .setPopup(popup)
+            .addTo(maplibreMap.current);
 
-        markers3D.current.push(marker);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          markers3D.current.push(marker as any);
 
-        if (m.id === mountain.id) {
-          marker.togglePopup();
+          if (m.id === mountain.id) {
+            marker.togglePopup();
+          }
         }
       });
 

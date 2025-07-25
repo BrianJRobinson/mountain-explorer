@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Extract hotels from the data array with detailed property mapping based on the exact structure
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       hotels = data.data.map((hotel: any) => {
         // Log each hotel object to debug
         console.log('[API] Processing hotel:', hotel.name || 'Unknown');

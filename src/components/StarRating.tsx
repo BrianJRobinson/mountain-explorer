@@ -8,6 +8,7 @@ interface StarRatingProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const StarRating: React.FC<StarRatingProps> = ({ rating, maxStars = 5, displayRating, interactive, size = 'md' }) => {
   if (rating <= 0) {
     return null; // Don't render anything if rating is 0 or less

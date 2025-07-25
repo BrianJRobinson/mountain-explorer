@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { hotelId: string } }
+  context: { params: Promise<{ hotelId: string }> }
 ) {
-  const { hotelId } = await params;
+  const { hotelId } = await context.params;
   
   console.log(`[API] Hotel details request for hotelId=${hotelId}`);
   

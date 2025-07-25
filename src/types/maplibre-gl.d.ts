@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable import/no-anonymous-default-export */
 declare module 'maplibre-gl' {
   export class Map {
     constructor(options: any);

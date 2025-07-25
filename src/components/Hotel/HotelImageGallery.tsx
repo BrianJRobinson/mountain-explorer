@@ -19,6 +19,7 @@ const HotelImageGallery: React.FC<HotelImageGalleryProps> = ({ images }) => {
       <div className={styles.imageGallery}>
         {displayImages.map((image, index) => (
           <a href={image} key={index} target="_blank" rel="noopener noreferrer" className={styles.galleryItem}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={image} 
               alt={`Hotel image ${index + 1}`} 

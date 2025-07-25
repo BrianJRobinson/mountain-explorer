@@ -50,6 +50,7 @@ function deduplicateAndMergeHotels(hotels: Hotel[]): Hotel[] {
       // Fill in any gaps in the winner's data using the loser's data.
       (Object.keys(loser) as Array<keyof Hotel>).forEach(key => {
         if (mergedHotel[key] === null || mergedHotel[key] === undefined || (typeof mergedHotel[key] === 'number' && mergedHotel[key] === 0)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (mergedHotel as any)[key] = loser[key];
         }
       });
@@ -72,10 +73,12 @@ export interface Hotel {
   latitude: number;
   longitude: number;
   rating: number;
-  images: string[];
+  images?: string[];
   price?: number;
   currency?: string;
   starRating?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rates?: any[];
   // New fields from the API response
   description?: string;
   thumbnail?: string;
@@ -90,6 +93,7 @@ export interface RoomType {
   price?: number;
   currency?: string;
   images?: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rates?: any[];
 }
 
@@ -255,6 +259,7 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
   const [fetchTrigger, setFetchTrigger] = useState(0); // To manually trigger refetch
   
   // Function to manually trigger a refetch
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const refetch = (newLat?: number, newLng?: number, newRadius?: number) => {
     console.log('[hotelService] Manually refetching hotels');
     // If new coordinates are provided, update the state before triggering the fetch

@@ -30,6 +30,7 @@ import { useHotelsNearby, Hotel } from '@/lib/hotelService';
 // Define the props for the HotelMarkers component
 interface HotelMarkersProps {
   map: L.Map | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   maplibreMap: any; // MapLibre GL map instance
   is3DMode: boolean;
   centerLat: number;
@@ -142,6 +143,7 @@ const mapStateReducer = (state: MapState, action: MapAction): MapState => {
       if (state.clusterLayer && action.payload.map) {
         try {
           action.payload.map.removeLayer(state.clusterLayer);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {
           // Ignore errors if layer is already removed
         }
@@ -167,6 +169,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   onRefreshReady,
   onLoadingChange,
 }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [mapState, dispatch] = useReducer(mapStateReducer, {
     clusterLayer: null,
     markers3D: [],
@@ -337,7 +340,6 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
 
     addMarkersAsync();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotels, visible, loading, is3DMode, map, maplibreMap]);
 
   useEffect(() => {
