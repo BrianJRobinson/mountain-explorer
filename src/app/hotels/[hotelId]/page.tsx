@@ -162,10 +162,10 @@ const DistanceDisplay: React.FC<{
 };
 
 // --- Nearby Hotels Sidebar Component ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NearbyHotels: React.FC<{ 
   hotels: Hotel[] | undefined, 
   loading: boolean, 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: any,
   referenceCoordinates?: { lat: number; lng: number }
 }> = ({ hotels, loading, error, referenceCoordinates }) => {
