@@ -268,6 +268,63 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
     window.open(finalUrl, '_blank');
   };
 
+  const handleContinueSearchClick = () => {
+    const whitelabelBaseUrl = process.env.NEXT_PUBLIC_LITEAPI_WHITELABEL_URL;
+
+    if (!whitelabelBaseUrl) {
+      console.error('LiteAPI Whitelabel URL is not configured.');
+      setRatesError('Booking service is not configured. Please contact support.');
+      return;
+    }
+
+    // Try multiple common URL parameter formats for booking sites
+    const params = new URLSearchParams({
+      // Standard booking parameters
+      checkin: selectedDate.checkIn,
+      checkout: selectedDate.checkOut,
+      adults: guests.adults.toString(),
+      children: guests.children.toString(),
+      rooms: '1',
+      currency: currency,
+      language: 'en',
+      
+      // Alternative parameter names that booking sites commonly use
+      check_in: selectedDate.checkIn,
+      check_out: selectedDate.checkOut,
+      'checkin-date': selectedDate.checkIn,
+      'checkout-date': selectedDate.checkOut,
+      guests: guests.adults.toString(),
+      room_count: '1',
+    });
+
+    // Add city/location parameters in multiple formats
+    if (hotel.city) {
+      params.set('city', hotel.city);
+      params.set('location', hotel.city);
+      params.set('destination', hotel.city);
+      params.set('q', hotel.city); // Common search query parameter
+    }
+
+    // Add coordinates if available for more precise location
+    if (hotel.latitude && hotel.longitude) {
+      params.set('lat', hotel.latitude.toString());
+      params.set('lng', hotel.longitude.toString());
+      params.set('longitude', hotel.longitude.toString());
+      params.set('latitude', hotel.latitude.toString());
+    }
+
+    // Ensure the base URL has a protocol
+    let fullWhitelabelUrl = whitelabelBaseUrl;
+    if (!/^https?:\/\//i.test(fullWhitelabelUrl)) {
+      fullWhitelabelUrl = `https://` + fullWhitelabelUrl;
+    }
+
+    // Use the base whitelabel URL with comprehensive search parameters
+    const finalUrl = `${fullWhitelabelUrl}?${params.toString()}`;
+
+    window.open(finalUrl, '_blank');
+  };
+
   return (
     <div className="space-y-8">
       {/* Header Image & Title */}
@@ -281,6 +338,9 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
           <h1 className="text-white text-4xl font-bold">{hotel.name}</h1>
+          {hotel.city && (
+            <p className="text-gray-200 text-lg mt-1">{hotel.city}</p>
+          )}
           <div className="mt-2">
             {(() => {
               const starsFromUrl = starsFromQuery ? parseInt(starsFromQuery, 10) : 0;
@@ -303,12 +363,14 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
         </div>
       </div>
 
+      {/* Full Width Image Gallery */}
+      <div className="mb-8">
+        <HotelImageGallery images={hotel.images || []} />
+      </div>
+
       {/* Main Details & Booking Form Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-8">
-          {/* Image Gallery */}
-          <HotelImageGallery images={hotel.images || []} />
-
           {/* About Section */}
           <div className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-2xl font-bold text-white mb-4">About this hotel</h2>
@@ -319,8 +381,10 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
           <div className="bg-gray-800 p-6 rounded-lg">
             <h2 className="text-2xl font-bold text-white mb-4">Amenities</h2>
             {hotel.amenities && hotel.amenities.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {hotel.amenities.map((amenity, i) => <div key={i} className="flex items-center"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>{amenity}</div>)}
+              <div className={`max-h-64 overflow-y-auto pr-2 ${styles.amenitiesScrollContainer}`}>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {hotel.amenities.map((amenity, i) => <div key={i} className="flex items-center"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>{amenity}</div>)}
+                </div>
               </div>
             ) : <p className="text-gray-500">No amenities information available.</p>}
           </div>
@@ -359,6 +423,13 @@ function HotelDetailsContent({ hotel, starsFromQuery }: { hotel: HotelDetails; s
               </div>
               <button onClick={handleCheckAvailability} disabled={isFetchingRates} className="w-full py-3 mt-2 rounded-md font-bold text-white transition-colors disabled:bg-gray-600 bg-orange-600 hover:bg-orange-700">
                 {isFetchingRates ? 'Checking...' : 'Check Availability'}
+              </button>
+
+              {/* Continue Search Button - Always Visible */}
+              <button 
+                onClick={handleContinueSearchClick} 
+                className="w-full py-3 mt-2 rounded-md font-bold text-white transition-colors bg-blue-600 hover:bg-blue-700 border border-blue-500">
+                Continue Search on Partner Site
               </button>
 
               {ratesError && <p className="text-red-400 text-sm mt-2">Error: {ratesError}</p>}
