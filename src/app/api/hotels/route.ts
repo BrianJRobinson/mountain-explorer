@@ -7,12 +7,19 @@ export async function GET(request: NextRequest) {
   const radius = searchParams.get('radius') || '10000';
   
   console.log(`[API] Hotel request for lat=${latitude}, lng=${longitude}, radius=${radius}`);
+  console.log('[API] Environment check:', {
+    hasLiteApiKey: !!process.env.LITEAPI_KEY,
+    hasPublicLiteApiKey: !!process.env.NEXT_PUBLIC_LITEAPI_KEY,
+    nodeEnv: process.env.NODE_ENV,
+    vercelEnv: process.env.VERCEL_ENV
+  });
   
   // For development, use a mock response if no API key is available
   const apiKey = process.env.LITEAPI_KEY || process.env.NEXT_PUBLIC_LITEAPI_KEY;
   
   if (!apiKey) {
-    console.warn('[API] No LiteAPI key found in environment variables');
+    console.error('[API] No LiteAPI key found in environment variables');
+    console.error('[API] Available env vars:', Object.keys(process.env).filter(key => key.includes('LITE')));
     
     // Return mock data for development
     return NextResponse.json({
@@ -57,12 +64,18 @@ export async function GET(request: NextRequest) {
     const apiUrl = `https://api.liteapi.travel/v3.0/data/hotels?longitude=${longitude}&latitude=${latitude}&radius=${radius}`;
     
     console.log(`[API] Fetching hotels from LiteAPI...`);
+    console.log(`[API] Request URL: ${apiUrl}`);
+    console.log(`[API] Using API key: ${apiKey ? apiKey.substring(0, 8) + '...' : 'NONE'}`);
+    
     const response = await fetch(apiUrl, {
       headers: {
         'accept': 'application/json',
         'X-API-Key': apiKey
       }
     });
+    
+    console.log(`[API] Response status: ${response.status}`);
+    console.log(`[API] Response headers:`, Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       const errorText = await response.text();
