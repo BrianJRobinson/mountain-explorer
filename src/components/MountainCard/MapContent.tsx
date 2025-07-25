@@ -227,6 +227,8 @@ export const MapContent: React.FC<MapContentProps> = ({
 
     maplibreMap.current = new maplibregl.Map(mapOptions);
 
+
+
     // Wait for map to load
     maplibreMap.current?.on('load', () => {
       if (!maplibreMap.current) return;
@@ -389,6 +391,8 @@ export const MapContent: React.FC<MapContentProps> = ({
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map.current);
+
+
 
     // Add custom zoom control
     const zoomAllButton = L.Control.extend({

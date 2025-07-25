@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Mountain } from '@/app/types/Mountain';
 import { MapLoader } from './MapLoader';
@@ -20,10 +20,53 @@ export const MountainMap: React.FC<MountainMapProps> = ({
   onMountainSelect,
   onClose,
 }) => {
-  const [is3DMode, setIs3DMode] = useState(false);
-  const [showHotels, setShowHotels] = useState(false);
+  // Generate a unique key for this mountain's map state
+  const storageKey = `mountain-map-${mountain.id}`;
+  
+  // Initialize state from sessionStorage
+  const [is3DMode, setIs3DMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.is3D || false;
+        } catch {
+          return false;
+        }
+      }
+    }
+    return false;
+  });
+  
+  const [showHotels, setShowHotels] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return parsed.hotels || false;
+        } catch {
+          return false;
+        }
+      }
+    }
+    return false;
+  });
+  
   const [isHotelLoading, setIsHotelLoading] = useState(false);
   const refreshHotelsRef = useRef<(() => void) | null>(null);
+  
+  // Save state to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const state = {
+        is3D: is3DMode,
+        hotels: showHotels
+      };
+      sessionStorage.setItem(storageKey, JSON.stringify(state));
+    }
+  }, [is3DMode, showHotels, storageKey]);
 
   if (!isOpen) return null;
 
