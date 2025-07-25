@@ -5,9 +5,9 @@ const renderStars = (starCount: number, numericRating?: number): string => {
   let starsHtml = '';
   if (starCount > 0) {
     const filledStar = `<svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>`;
-    const emptyStar = `<svg class="w-4 h-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>`;
-    for (let i = 0; i < 5; i++) {
-      starsHtml += i < starCount ? filledStar : emptyStar;
+    // Show only the actual number of stars the hotel has (not out of 5)
+    for (let i = 0; i < starCount; i++) {
+      starsHtml += filledStar;
     }
   }
 
