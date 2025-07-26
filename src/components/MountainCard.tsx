@@ -85,6 +85,23 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     checkComments();
   }, [mountain.id]);
 
+  // Add tab visibility debugging
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      console.log('🗻 [POPUP DEBUG] Tab visibility changed:', {
+        hidden: document.hidden,
+        visibilityState: document.visibilityState,
+        timestamp: new Date().toISOString()
+      });
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // Initialize 3D map
   const initialize3DMap = useCallback(() => {
     if (!maplibregl || !mapContainer.current) return;
@@ -241,6 +258,7 @@ export const MountainCard: React.FC<MountainCardProps> = ({
           markers3D.current.push(marker as any);
 
           if (m.id === mountain.id) {
+            console.log('🗻 [POPUP DEBUG] Opening popup for mountain:', mountain.id);
             marker.togglePopup();
           }
         }

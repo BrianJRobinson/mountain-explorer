@@ -7,19 +7,8 @@ import { HotelDetails, RoomType, useHotelDetails, useHotelsNearby, Hotel } from 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import StarRating from '@/components/StarRating';
 import HotelImageGallery from '@/components/Hotel/HotelImageGallery';
+import { loadBookingDetails, updateBookingDetails, getDefaultBookingDetails } from '@/lib/bookingContext';
 import styles from './HotelDetails.module.css';
-
-// --- Helper Functions ---
-const getTomorrowDate = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
-};
-const getDayAfterTomorrowDate = () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 2);
-  return d.toISOString().split('T')[0];
-};
 
 // Calendar helper functions
 const getDaysInMonth = (date: Date) => {
@@ -207,6 +196,9 @@ const NearbyHotels: React.FC<{
   if (error) return <div className="mt-8"><p className="text-red-500">Error loading nearby hotels.</p></div>;
   if (!hotels || hotels.length === 0) return <div className="mt-8"><p>No nearby hotels found.</p></div>;
 
+  // Get current booking details to preserve in nearby hotel links
+  const currentBooking = loadBookingDetails();
+  
   // Limit to 3 rows of 5 columns (15 hotels)
   const displayedHotels = hotels.slice(0, 15);
 
@@ -216,7 +208,7 @@ const NearbyHotels: React.FC<{
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
         {displayedHotels.map(nearbyHotel => (
           <Link 
-            href={`/hotels/${nearbyHotel.id}?lat=${nearbyHotel.latitude}&lng=${nearbyHotel.longitude}&stars=${nearbyHotel.starRating || 0}`} 
+            href={`/hotels/${nearbyHotel.id}?lat=${nearbyHotel.latitude}&lng=${nearbyHotel.longitude}&stars=${nearbyHotel.starRating || 0}&checkIn=${currentBooking.checkIn}&checkOut=${currentBooking.checkOut}&adults=${currentBooking.adults}&children=${currentBooking.children}`} 
             key={nearbyHotel.id} 
             className="block border rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300 ease-in-out"
           >
@@ -341,11 +333,114 @@ function HotelDetailsContent({
   starsFromQuery: string | null;
   referenceCoordinates?: { lat: number; lng: number };
 }) {
-  const [selectedDate, setSelectedDate] = useState({ checkIn: getTomorrowDate(), checkOut: getDayAfterTomorrowDate() });
+  const searchParams = useSearchParams();
+  
+  // Initialize state with default values (lazy load booking context later)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const defaults = getDefaultBookingDetails();
+    return { checkIn: defaults.checkIn, checkOut: defaults.checkOut };
+  });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [tempSelectedDates, setTempSelectedDates] = useState<string[]>([]);
-  const [guests, setGuests] = useState({ adults: 2, children: 0 });
+  const [guests, setGuests] = useState(() => {
+    const defaults = getDefaultBookingDetails();
+    return { adults: defaults.adults, children: defaults.children };
+  });
+
+  // Lazy load booking details to prevent localStorage interference with map popup
+  useEffect(() => {
+    console.log('🏨 [HOTEL DEBUG] Lazy loading booking details...');
+    const booking = loadBookingDetails();
+    
+    // Only update state if values are different from defaults
+    const defaults = getDefaultBookingDetails();
+    if (booking.checkIn !== defaults.checkIn || booking.checkOut !== defaults.checkOut) {
+      console.log('🏨 [HOTEL DEBUG] Updating selectedDate from localStorage:', { checkIn: booking.checkIn, checkOut: booking.checkOut });
+      setSelectedDate({ checkIn: booking.checkIn, checkOut: booking.checkOut });
+    }
+    
+    if (booking.adults !== defaults.adults || booking.children !== defaults.children) {
+      console.log('🏨 [HOTEL DEBUG] Updating guests from localStorage:', { adults: booking.adults, children: booking.children });
+      setGuests({ adults: booking.adults, children: booking.children });
+    }
+    
+  }, []); // Only run once on mount
+
+  // Initialize from URL parameters if provided (e.g., from nearby hotel links)
+  useEffect(() => {
+    console.log('🔗 [HOTEL DEBUG] Checking URL parameters for booking details...');
+    const urlCheckIn = searchParams.get('checkIn');
+    const urlCheckOut = searchParams.get('checkOut');
+    const urlAdults = searchParams.get('adults');
+    const urlChildren = searchParams.get('children');
+    
+    console.log('🔗 [HOTEL DEBUG] URL parameters found:', {
+      urlCheckIn,
+      urlCheckOut,
+      urlAdults,
+      urlChildren,
+      hasAnyParams: !!(urlCheckIn || urlCheckOut || urlAdults || urlChildren)
+    });
+    
+    if (urlCheckIn || urlCheckOut || urlAdults || urlChildren) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const updates: any = {};
+      
+      if (urlCheckIn) {
+        console.log('🔗 [HOTEL DEBUG] Setting checkIn from URL:', urlCheckIn);
+        setSelectedDate(prev => ({ ...prev, checkIn: urlCheckIn }));
+        updates.checkIn = urlCheckIn;
+      }
+      if (urlCheckOut) {
+        console.log('🔗 [HOTEL DEBUG] Setting checkOut from URL:', urlCheckOut);
+        setSelectedDate(prev => ({ ...prev, checkOut: urlCheckOut }));
+        updates.checkOut = urlCheckOut;
+      }
+      if (urlAdults) {
+        const adults = parseInt(urlAdults, 10);
+        if (!isNaN(adults)) {
+          console.log('🔗 [HOTEL DEBUG] Setting adults from URL:', adults);
+          setGuests(prev => ({ ...prev, adults }));
+          updates.adults = adults;
+        }
+      }
+      if (urlChildren) {
+        const children = parseInt(urlChildren, 10);
+        if (!isNaN(children)) {
+          console.log('🔗 [HOTEL DEBUG] Setting children from URL:', children);
+          setGuests(prev => ({ ...prev, children }));
+          updates.children = children;
+        }
+      }
+      
+      // Save the URL parameters to booking context
+      if (Object.keys(updates).length > 0) {
+        console.log('🔗 [HOTEL DEBUG] Updating booking context with URL params:', updates);
+        updateBookingDetails(updates);
+      }
+    } else {
+      console.log('🔗 [HOTEL DEBUG] No URL parameters found, using existing booking context');
+    }
+  }, [searchParams]);
+
+  // Save booking details whenever they change
+  useEffect(() => {
+    const currentDetails = {
+      checkIn: selectedDate.checkIn,
+      checkOut: selectedDate.checkOut,
+      adults: guests.adults,
+      children: guests.children
+    };
+    
+    console.log('💾 [HOTEL DEBUG] Auto-saving booking details due to state change:', {
+      currentDetails,
+      timestamp: new Date().toISOString(),
+      url: window.location.href
+    });
+    
+    updateBookingDetails(currentDetails);
+  }, [selectedDate.checkIn, selectedDate.checkOut, guests.adults, guests.children]);
 
   // Debug logging for distance display
   console.log('Distance Debug:', {
