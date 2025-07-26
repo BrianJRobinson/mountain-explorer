@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Mountain } from '@/app/types/Mountain';
 import { MapLoader } from './MapLoader';
@@ -11,6 +11,10 @@ interface MountainMapProps {
   allMountains: Mountain[];
   onMountainSelect?: (mountainName: string) => void;
   onClose: () => void;
+  is3DMode: boolean;
+  onToggle3D: (enabled: boolean) => void;
+  hotelsVisible: boolean;
+  onToggleHotels: (visible: boolean) => void;
 }
 
 export const MountainMap: React.FC<MountainMapProps> = ({
@@ -19,54 +23,18 @@ export const MountainMap: React.FC<MountainMapProps> = ({
   allMountains,
   onMountainSelect,
   onClose,
+  is3DMode,
+  onToggle3D,
+  hotelsVisible,
+  onToggleHotels,
 }) => {
-  // Generate a unique key for this mountain's map state
-  const storageKey = `mountain-map-${mountain.id}`;
-  
-  // Initialize state from sessionStorage
-  const [is3DMode, setIs3DMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.is3D || false;
-        } catch {
-          return false;
-        }
-      }
-    }
-    return false;
-  });
-  
-  const [showHotels, setShowHotels] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          return parsed.hotels || false;
-        } catch {
-          return false;
-        }
-      }
-    }
-    return false;
-  });
+  // Use showHotels as alias for hotelsVisible prop for consistency with existing code
+  const showHotels = hotelsVisible;
   
   const [isHotelLoading, setIsHotelLoading] = useState(false);
   const refreshHotelsRef = useRef<(() => void) | null>(null);
   
-  // Save state to sessionStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const state = {
-        is3D: is3DMode,
-        hotels: showHotels
-      };
-      sessionStorage.setItem(storageKey, JSON.stringify(state));
-    }
-  }, [is3DMode, showHotels, storageKey]);
+  // No longer need sessionStorage - state is managed by parent component
 
   if (!isOpen) return null;
 
@@ -87,7 +55,7 @@ export const MountainMap: React.FC<MountainMapProps> = ({
               <span className="text-sm text-gray-300">3D</span>
               <ToggleButton
                 isToggled={is3DMode}
-                onToggle={() => setIs3DMode(!is3DMode)}
+                onToggle={() => onToggle3D(!is3DMode)}
                 size="sm"
                 label={is3DMode ? 'Switch to 2D view' : 'Switch to 3D view'}
               />
@@ -96,7 +64,7 @@ export const MountainMap: React.FC<MountainMapProps> = ({
               <span className="text-sm text-gray-300">Hotels</span>
               <ToggleButton
                 isToggled={showHotels}
-                onToggle={() => setShowHotels(!showHotels)}
+                onToggle={() => onToggleHotels(!showHotels)}
                 size="sm"
                 label={showHotels ? 'Hide Hotels' : 'Show Hotels'}
               />

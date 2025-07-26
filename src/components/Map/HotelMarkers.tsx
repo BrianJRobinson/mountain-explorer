@@ -248,7 +248,9 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
 
   useEffect(() => {
     if (!visible) {
-      dispatch({ type: 'CLEAR_ALL', payload: { map } });
+      if (map && map.getContainer && map.getContainer()) {
+        dispatch({ type: 'CLEAR_ALL', payload: { map } });
+      }
       return;
     }
 
@@ -324,13 +326,13 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
           clusterLayer.addLayer(marker);
         });
 
-        if (isMounted.current) {
+        if (isMounted.current && map && map.getContainer && map.getContainer()) {
           map.addLayer(clusterLayer);
         }
         newClusterLayer = clusterLayer;
       }
 
-      if (isMounted.current) {
+      if (isMounted.current && map && map.getContainer && map.getContainer()) {
         dispatch({
           type: 'SET_MARKERS',
           payload: { map, clusterLayer: newClusterLayer, markers3D: newMarkers3D },

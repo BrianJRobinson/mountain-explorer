@@ -3,6 +3,7 @@ import type { Map as LeafletMap } from 'leaflet';
 import type { Map as MapLibreMap, MapOptions, Marker } from 'maplibre-gl';
 import { Mountain } from '@/app/types/Mountain';
 import { HotelMarkers } from '../Map/HotelMarkers';
+import { loadMapState, updateMapPosition } from '@/lib/mapStateContext';
 
 interface MapContentProps {
   mountain: Mountain;
@@ -381,18 +382,32 @@ export const MapContent: React.FC<MapContentProps> = ({
     const lat = parseFloat(mountain.ukHillsDbLatitude);
     const lng = parseFloat(mountain.ukHillsDbLongitude);
 
-    // Initialize map centered on the current mountain with closer zoom
+    // Load saved map state for position restoration
+    const mapState = loadMapState();
+    const center = mapState.center ? [mapState.center.lat, mapState.center.lng] : [lat, lng];
+    const zoom = mapState.zoom || 13;
+
+    console.log('🗺️ [MAP RESTORE] Restoring 2D map position:', { center, zoom, saved: !!mapState.center });
+
+    // Initialize map centered on saved position or current mountain with closer zoom
     map.current = L.map(mapContainer.current, {
       scrollWheelZoom: true,
       zoomControl: true,
       maxZoom: 18, // Set a max zoom level to avoid errors
-    }).setView([lat, lng], 13);
+    }).setView(center as [number, number], zoom);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map.current);
 
-
+    // Add event listeners to save map position when user moves or zooms
+    map.current.on('moveend zoomend', () => {
+      if (map.current) {
+        const center = map.current.getCenter();
+        const zoom = map.current.getZoom();
+        updateMapPosition({ lat: center.lat, lng: center.lng }, zoom);
+      }
+    });
 
     // Add custom zoom control
     const zoomAllButton = L.Control.extend({

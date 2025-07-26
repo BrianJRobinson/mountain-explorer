@@ -15,6 +15,7 @@ import { CompletionModal } from './MountainCard/CompletionModal';
 import { CommentsModal } from './MountainCard/CommentsModal';
 import { CompletionCelebration } from './shared/CompletionCelebration';
 import { loadMapLibraries } from '@/lib/mapLibraries';
+import { loadMapState, updateMapState, updateMapPosition } from '@/lib/mapStateContext';
 
 interface MountainCardProps {
   mountain: Mountain;
@@ -54,8 +55,20 @@ export const MountainCard: React.FC<MountainCardProps> = ({
   const [selectedRating, setSelectedRating] = useState<number>();
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showMap, setShowMap] = useState(false);
-  const [is3DMode] = useState(false);
+  // Initialize map state with persistence
+  const [showMap, setShowMap] = useState(() => {
+    const mapState = loadMapState();
+    // Only show map if this mountain was the active one
+    return mapState.activeMountainId === mountain.id;
+  });
+  const [is3DMode, setIs3DMode] = useState(() => {
+    const mapState = loadMapState();
+    return mapState.is3D;
+  });
+  const [hotelsVisible, setHotelsVisible] = useState(() => {
+    const mapState = loadMapState();
+    return mapState.hotelsVisible;
+  });
   const [showComments, setShowComments] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -123,6 +136,13 @@ export const MountainCard: React.FC<MountainCardProps> = ({
     const lat = parseFloat(mountain.ukHillsDbLatitude);
     const lng = parseFloat(mountain.ukHillsDbLongitude);
 
+    // Load saved map state for position restoration
+    const mapState = loadMapState();
+    const center = mapState.center ? [mapState.center.lng, mapState.center.lat] : [lng, lat]; // Note: MapLibre uses [lng, lat]
+    const zoom = mapState.zoom || 12;
+
+    console.log('🗺️ [MAP RESTORE] Restoring 3D map position:', { center, zoom, saved: !!mapState.center });
+
     // Add styles for 3D markers
     const style = document.createElement('style');
     style.setAttribute('data-mountain-marker', 'true');
@@ -180,13 +200,22 @@ export const MountainCard: React.FC<MountainCardProps> = ({
           exaggeration: 1.2
         }
       },
-      center: [lng, lat],
-      zoom: 12,
+      center: center as [number, number],
+      zoom: zoom,
       pitch: 60,
       bearing: 30
     };
 
     maplibreMap.current = new maplibregl.Map(mapOptions);
+
+    // Add event listeners to save map position when user moves or zooms
+    maplibreMap.current.on('moveend', () => {
+      if (maplibreMap.current) {
+        const center = maplibreMap.current.getCenter();
+        const zoom = maplibreMap.current.getZoom();
+        updateMapPosition({ lat: center.lat, lng: center.lng }, zoom);
+      }
+    });
 
     // Wait for map to load
     maplibreMap.current?.on('load', () => {
@@ -696,7 +725,14 @@ export const MountainCard: React.FC<MountainCardProps> = ({
                 latitude={mountain.ukHillsDbLatitude}
                 longitude={mountain.ukHillsDbLongitude}
                 region={mountain.ukHillsDbSection}
-                onShowMap={() => setShowMap(true)}
+                onShowMap={() => {
+                  setShowMap(true);
+                  updateMapState({ 
+                    activeMountainId: mountain.id,
+                    is3D: is3DMode,
+                    hotelsVisible: hotelsVisible
+                  });
+                }}
               />
 
               {/* Rating Stars and Comment Button */}
@@ -716,10 +752,23 @@ export const MountainCard: React.FC<MountainCardProps> = ({
         {showMap && (
           <MountainMap
             isOpen={showMap}
-            onClose={() => setShowMap(false)}
+            onClose={() => {
+              setShowMap(false);
+              updateMapState({ activeMountainId: undefined });
+            }}
             mountain={mountain}
             allMountains={allMountains}
             onMountainSelect={onMapMarkerClick}
+            is3DMode={is3DMode}
+            onToggle3D={(enabled) => {
+              setIs3DMode(enabled);
+              updateMapState({ is3D: enabled });
+            }}
+            hotelsVisible={hotelsVisible}
+            onToggleHotels={(visible) => {
+              setHotelsVisible(visible);
+              updateMapState({ hotelsVisible: visible });
+            }}
           />
         )}
 
