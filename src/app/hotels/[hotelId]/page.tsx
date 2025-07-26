@@ -22,6 +22,41 @@ const getDayAfterTomorrowDate = () => {
   return d.toISOString().split('T')[0];
 };
 
+// Calendar helper functions
+const getDaysInMonth = (date: Date) => {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+};
+
+const getFirstDayOfMonth = (date: Date) => {
+  return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+};
+
+const formatDateForDisplay = (dateStr: string) => {
+  // Parse date string as local date to avoid timezone issues
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day); // month is 0-indexed
+  return date.toLocaleDateString('en-US', { 
+    weekday: 'short', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+};
+
+const isSameDay = (date1: string, date2: string) => {
+  return date1 === date2;
+};
+
+const isDateInRange = (date: string, startDate: string, endDate: string) => {
+  return date >= startDate && date <= endDate;
+};
+
+const isDateDisabled = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+};
+
 // Calculate distance between two coordinates using Haversine formula
 const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
   const R = 6371; // Earth's radius in kilometers
@@ -308,6 +343,9 @@ function HotelDetailsContent({
   referenceCoordinates?: { lat: number; lng: number };
 }) {
   const [selectedDate, setSelectedDate] = useState({ checkIn: getTomorrowDate(), checkOut: getDayAfterTomorrowDate() });
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [tempSelectedDates, setTempSelectedDates] = useState<string[]>([]);
   const [guests, setGuests] = useState({ adults: 2, children: 0 });
 
   // Debug logging for distance display
@@ -354,6 +392,53 @@ function HotelDetailsContent({
     
     initializeLocaleSettings();
   }, []);
+
+  // Calendar date handling functions
+  const handleDateClick = (dateStr: string) => {
+    if (isDateDisabled(dateStr)) return;
+    
+    if (tempSelectedDates.length === 0) {
+      // First click - select first date
+      setTempSelectedDates([dateStr]);
+    } else if (tempSelectedDates.length === 1) {
+      // Second click - determine check-in and check-out based on chronological order
+      const firstDate = tempSelectedDates[0];
+      const secondDate = dateStr;
+      
+      if (firstDate === secondDate) {
+        // Same date clicked twice, reset
+        setTempSelectedDates([dateStr]);
+        return;
+      }
+      
+      // Automatically assign check-in (earlier) and check-out (later)
+      const checkIn = firstDate <= secondDate ? firstDate : secondDate;
+      const checkOut = firstDate <= secondDate ? secondDate : firstDate;
+      
+      setSelectedDate({ checkIn, checkOut });
+      setTempSelectedDates([]);
+      setIsCalendarOpen(false);
+    }
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCalendarMonth(prev => {
+      const newMonth = new Date(prev);
+      if (direction === 'prev') {
+        newMonth.setMonth(prev.getMonth() - 1);
+      } else {
+        newMonth.setMonth(prev.getMonth() + 1);
+      }
+      return newMonth;
+    });
+  };
+
+  const openCalendar = () => {
+    setIsCalendarOpen(true);
+    setTempSelectedDates([]); // Clear any temporary selections
+    // Set calendar to show the month of the current check-in date
+    setCalendarMonth(new Date(selectedDate.checkIn));
+  };
 
   const handleCurrencyChange = (newCurrency: string) => {
     setCurrency(newCurrency);
@@ -590,13 +675,169 @@ function HotelDetailsContent({
           <div className="bg-gray-800 p-6 rounded-lg sticky top-8">
             <h2 className="text-2xl font-bold text-white mb-4">Book Your Stay</h2>
             <div className="space-y-4">
-              <div className="relative w-full group">
-                <label className="block text-sm font-medium text-gray-400 mb-1 ">Check-in</label>
-                <input type="date" value={selectedDate.checkIn} min={getTodayDate()} onChange={e => setSelectedDate(p => ({ ...p, checkIn: e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500 border border-gray-600 group-hover:bg-gray-600 transition-colors duration-150" />
-              </div>
-              <div className="relative w-full group">
-                <label className="block text-sm font-medium text-gray-400 mb-1">Check-out</label>
-                <input type="date" value={selectedDate.checkOut} min={selectedDate.checkIn} onChange={e => setSelectedDate(p => ({ ...p, checkOut: e.target.value }))} className="w-full bg-gray-700 border-gray-600 rounded-md p-2 text-white focus:ring-orange-500 focus:border-orange-500 border border-gray-600 group-hover:bg-gray-600 transition-colors duration-150" />
+              {/* Date Range Selector */}
+              <div className="relative w-full">
+                <label className="block text-sm font-medium text-gray-400 mb-1">Dates</label>
+                <button
+                  onClick={openCalendar}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md p-3 text-left hover:bg-gray-600 transition-colors duration-150 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <div className="flex justify-between items-center">
+                    <div className="flex flex-col">
+                      <div className="text-white font-medium">
+                        {formatDateForDisplay(selectedDate.checkIn)} - {formatDateForDisplay(selectedDate.checkOut)}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {(() => {
+                          const checkIn = new Date(selectedDate.checkIn);
+                          const checkOut = new Date(selectedDate.checkOut);
+                          const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+                          return `${nights} night${nights !== 1 ? 's' : ''}`;
+                        })()}
+                      </div>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                </button>
+
+                {/* Calendar Popup */}
+                {isCalendarOpen && (
+                  <div className="absolute top-full left-0 mt-2 bg-gray-800 border border-gray-600 rounded-lg shadow-2xl z-50 p-4 w-80">
+                    {/* Calendar Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <button
+                        onClick={() => navigateMonth('prev')}
+                        className="p-1 hover:bg-gray-700 rounded transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      
+                      <h3 className="text-white font-medium">
+                        {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </h3>
+                      
+                      <button
+                        onClick={() => navigateMonth('next')}
+                        className="p-1 hover:bg-gray-700 rounded transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* Selection Status */}
+                    <div className="mb-3 text-center">
+                      <div className="text-xs text-gray-400">
+                        {tempSelectedDates.length === 0 ? 'Select your dates' : tempSelectedDates.length === 1 ? 'Select end date' : 'Dates selected'}
+                      </div>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1">
+                      {/* Day Headers */}
+                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                        <div key={day} className="text-center text-xs text-gray-500 py-2 font-medium">
+                          {day}
+                        </div>
+                      ))}
+                      
+                      {/* Calendar Days */}
+                      {(() => {
+                        const daysInMonth = getDaysInMonth(calendarMonth);
+                        const firstDay = getFirstDayOfMonth(calendarMonth);
+                        const days = [];
+                        
+                        // Empty cells for days before month starts
+                        for (let i = 0; i < firstDay; i++) {
+                          days.push(<div key={`empty-${i}`} className="h-8" />);
+                        }
+                        
+                        // Days of the month
+                        for (let day = 1; day <= daysInMonth; day++) {
+                          // Generate date string consistently to avoid timezone issues
+                          const year = calendarMonth.getFullYear();
+                          const month = String(calendarMonth.getMonth() + 1).padStart(2, '0');
+                          const dayStr = String(day).padStart(2, '0');
+                          const dateStr = `${year}-${month}-${dayStr}`;
+                          const isDisabled = isDateDisabled(dateStr);
+                          const isSelected = tempSelectedDates.includes(dateStr);
+                          
+                          // Only show existing dates if we haven't started a new selection
+                          const showExistingDates = tempSelectedDates.length === 0;
+                          const isCheckIn = showExistingDates && isSameDay(dateStr, selectedDate.checkIn);
+                          const isCheckOut = showExistingDates && isSameDay(dateStr, selectedDate.checkOut);
+                          const isInRange = showExistingDates && isDateInRange(dateStr, selectedDate.checkIn, selectedDate.checkOut);
+                          
+                          // Show temp range if we have exactly one temp date selected
+                          const tempRangeStart = tempSelectedDates.length === 1 ? tempSelectedDates[0] : null;
+                          const isInTempRange = tempRangeStart && tempRangeStart !== dateStr && 
+                            ((tempRangeStart < dateStr && dateStr < tempRangeStart) || 
+                             (dateStr < tempRangeStart && dateStr > tempRangeStart));
+                          
+                          days.push(
+                            <button
+                              key={day}
+                              onClick={() => handleDateClick(dateStr)}
+                              disabled={isDisabled}
+                              className={`
+                                h-8 w-8 text-sm rounded transition-colors relative
+                                ${isDisabled 
+                                  ? 'text-gray-600 cursor-not-allowed' 
+                                  : 'text-white hover:bg-gray-700 cursor-pointer'
+                                }
+                                ${isSelected || isCheckIn || isCheckOut 
+                                  ? 'bg-orange-500 text-white font-bold' 
+                                  : ''
+                                }
+                                ${(isInRange || isInTempRange) && !isSelected && !isCheckIn && !isCheckOut 
+                                  ? 'bg-orange-200 text-orange-900' 
+                                  : ''
+                                }
+                              `}
+                            >
+                              {day}
+                            </button>
+                          );
+                        }
+                        
+                        return days;
+                      })()}
+                    </div>
+                    
+                    {/* Footer */}
+                    <div className="mt-4 pt-3 border-t border-gray-600 flex justify-between items-center">
+                      <div className="text-xs text-gray-400">
+                        {selectedDate.checkIn && selectedDate.checkOut && tempSelectedDates.length === 0 && (
+                          <span className="text-orange-400">
+                            {(() => {
+                              const checkIn = new Date(selectedDate.checkIn);
+                              const checkOut = new Date(selectedDate.checkOut);
+                              const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+                              return `${nights} night${nights !== 1 ? 's' : ''} selected`;
+                            })()} 
+                          </span>
+                        )}
+                        {tempSelectedDates.length === 1 && (
+                          <span className="text-orange-400">Select end date</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsCalendarOpen(false);
+                          setTempSelectedDates([]);
+                        }}
+                        className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition-colors"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="relative w-full group">
                 <label className="block text-sm font-medium text-gray-400 mb-1">Adults</label>
