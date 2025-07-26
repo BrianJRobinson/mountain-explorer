@@ -142,9 +142,15 @@ export async function GET(request: NextRequest) {
     
     console.log(`[API] Successfully extracted ${hotels.length} hotels`);
 
-    // Manually limit the number of hotels to 50, as the API does not support a limit parameter
-    if (hotels.length > 50) {
-      hotels = hotels.slice(0, 50);
+    // Filter out hotels with empty descriptions
+    const hotelsBeforeDescriptionFilter = hotels.length;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    hotels = hotels.filter((hotel: any) => hotel.description && hotel.description.trim().length > 0);
+    console.log(`[API] Filtered out ${hotelsBeforeDescriptionFilter - hotels.length} hotels with empty descriptions, ${hotels.length} remaining`);
+
+    // Manually limit the number of hotels to 15, as the API does not support a limit parameter
+    if (hotels.length > 15) {
+      hotels = hotels.slice(0, 15);
       console.log(`[API] Returning ${hotels.length} hotels after applying limit`);
     }
     
