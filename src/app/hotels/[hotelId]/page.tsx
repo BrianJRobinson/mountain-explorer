@@ -10,7 +10,6 @@ import HotelImageGallery from '@/components/Hotel/HotelImageGallery';
 import styles from './HotelDetails.module.css';
 
 // --- Helper Functions ---
-const getTodayDate = () => new Date().toISOString().split('T')[0];
 const getTomorrowDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 1);
