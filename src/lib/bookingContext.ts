@@ -38,22 +38,7 @@ export function saveBookingDetails(details: BookingDetails): void {
     if (typeof window !== 'undefined') {
       const serialized = JSON.stringify(details);
       localStorage.setItem(BOOKING_STORAGE_KEY, serialized);
-      console.log('🔄 [BOOKING DEBUG] Saved booking details to localStorage:', {
-        details,
-        serialized,
-        timestamp: new Date().toISOString(),
-        url: window.location.href,
-        storageKey: BOOKING_STORAGE_KEY
-      });
-      
-      // Verify the save worked
-      const verification = localStorage.getItem(BOOKING_STORAGE_KEY);
-      if (verification !== serialized) {
-        console.error('🚨 [BOOKING DEBUG] Save verification failed!', {
-          expected: serialized,
-          actual: verification
-        });
-      }
+      // Saved booking details to localStorage
     } else {
       console.warn('🚨 [BOOKING DEBUG] Cannot save - window is undefined');
     }
@@ -64,45 +49,22 @@ export function saveBookingDetails(details: BookingDetails): void {
 
 // Load booking details from localStorage
 export function loadBookingDetails(): BookingDetails {
-  console.log('📥 [BOOKING DEBUG] Loading booking details from localStorage...', {
-    timestamp: new Date().toISOString(),
-    url: typeof window !== 'undefined' ? window.location.href : 'SSR',
-    storageKey: BOOKING_STORAGE_KEY
-  });
-  
   try {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(BOOKING_STORAGE_KEY);
-      console.log('📥 [BOOKING DEBUG] Raw stored value from localStorage:', {
-        stored,
-        type: typeof stored,
-        length: stored?.length || 0
-      });
-      
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('✅ [BOOKING DEBUG] Successfully loaded booking details from localStorage:', {
-          parsed,
-          isValid: !!(parsed.checkIn && parsed.checkOut && parsed.adults),
-          timestamp: new Date().toISOString()
-        });
         return parsed;
       } else {
-        console.log('ℹ️ [BOOKING DEBUG] No stored booking details found in localStorage');
+        // No stored booking details found
       }
     } else {
-      console.log('ℹ️ [BOOKING DEBUG] Window undefined - using defaults (SSR)');
+      // Window undefined - using defaults (SSR)
     }
   } catch (error) {
     console.error('🚨 [BOOKING DEBUG] Failed to load booking details from localStorage:', error);
   }
-  
   const defaults = getDefaultBookingDetails();
-  console.log('🔄 [BOOKING DEBUG] Using default booking details:', {
-    defaults,
-    reason: 'No stored data or error occurred',
-    timestamp: new Date().toISOString()
-  });
   return defaults;
 }
 
@@ -111,7 +73,7 @@ export function clearBookingDetails(): void {
   try {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(BOOKING_STORAGE_KEY);
-      console.log('🗑️ [BOOKING DEBUG] Booking details cleared from localStorage');
+      // Booking details cleared from localStorage
     }
   } catch (error) {
     console.error('🚨 [BOOKING DEBUG] Failed to clear booking details from localStorage:', error);

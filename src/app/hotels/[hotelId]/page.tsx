@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { detectUserRegion, getDefaultCurrency } from '@/lib/geolocation';
 import { HotelDetails, RoomType, useHotelDetails, useHotelsNearby, Hotel } from '@/lib/hotelService';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import StarRating from '@/components/StarRating';
@@ -57,69 +58,12 @@ const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c; // Distance in kilometers
 };
 
-// Detect user's country/region using multiple methods
-const detectUserRegion = async (): Promise<string> => {
-  // Check localStorage cache first
-  const cached = typeof localStorage !== 'undefined' ? localStorage.getItem('user-region') : null;
-  if (cached) {
-    console.log('Using cached region:', cached);
-    return cached;
-  }
-
-  let detectedRegion = 'UNKNOWN';
-
-  try {
-    // Method 1: IP Geolocation (most accurate for actual location)
-    console.log('Trying IP geolocation first...');
-    try {
-      const response = await fetch('https://ipapi.co/json/', { 
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        console.log('IP geolocation data:', data);
-        if (data.country_code) {
-          detectedRegion = data.country_code.toUpperCase();
-          console.log('Using IP geolocation region:', detectedRegion);
-        }
-      }
-    } catch (ipError) {
-      console.warn('IP geolocation failed:', ipError);
-    }
-
-    // Method 2: Browser language fallback (if IP geolocation fails)
-    if (detectedRegion === 'UNKNOWN' && typeof navigator !== 'undefined' && navigator.language) {
-      console.log('Falling back to browser locale...');
-      const locale = navigator.language;
-      console.log('Browser locale:', locale);
-      
-      // Extract country code from locale (e.g., en-AU -> AU)
-      if (locale.includes('-')) {
-        const countryCode = locale.split('-')[1].toUpperCase();
-        console.log('Country from locale:', countryCode);
-        detectedRegion = countryCode;
-      }
-    }
-
-    // Cache the result for 24 hours
-    if (typeof localStorage !== 'undefined' && detectedRegion !== 'UNKNOWN') {
-      localStorage.setItem('user-region', detectedRegion);
-      localStorage.setItem('user-region-timestamp', Date.now().toString());
-    }
-
-  } catch (error) {
-    console.error('Region detection error:', error);
-  }
-
-  console.log('Final detected region:', detectedRegion);
-  return detectedRegion;
-};
-
 // Format distance based on detected user region
 const formatDistance = async (distanceKm: number): Promise<string> => {
-  const region = await detectUserRegion();
+  const region = (await detectUserRegion()).toUpperCase();
   
+  console.log('Detected region:', region);
+
   // Countries that primarily use miles (Imperial system)
   const imperialCountries = ['US', 'LR', 'MM']; // USA, Liberia, Myanmar
   // UK uses miles for distance but km for shorter measurements - we'll use miles for consistency
@@ -135,53 +79,23 @@ const formatDistance = async (distanceKm: number): Promise<string> => {
   }
 };
 
-// Get default currency based on detected region
-const getDefaultCurrency = async (): Promise<string> => {
-  const region = await detectUserRegion();
-  
-  // Map regions to their primary currencies
-  const currencyMap: { [key: string]: string } = {
-    'AU': 'AUD', // Australia
-    'US': 'USD', // United States
-    'GB': 'GBP', // United Kingdom
-    'UK': 'GBP', // United Kingdom (alternative code)
-    'CA': 'CAD', // Canada
-    'JP': 'JPY', // Japan
-    'NZ': 'NZD', // New Zealand
-    'SG': 'SGD', // Singapore
-    'HK': 'HKD', // Hong Kong
-    'CH': 'CHF', // Switzerland
-    'NO': 'NOK', // Norway
-    'SE': 'SEK', // Sweden
-    'DK': 'DKK', // Denmark
-    // Eurozone countries
-    'DE': 'EUR', 'FR': 'EUR', 'IT': 'EUR', 'ES': 'EUR', 'NL': 'EUR',
-    'BE': 'EUR', 'AT': 'EUR', 'PT': 'EUR', 'IE': 'EUR', 'FI': 'EUR',
-    'GR': 'EUR', 'LU': 'EUR', 'SI': 'EUR', 'SK': 'EUR', 'EE': 'EUR',
-    'LV': 'EUR', 'LT': 'EUR', 'CY': 'EUR', 'MT': 'EUR'
-  };
-  
-  const defaultCurrency = currencyMap[region] || 'USD'; // Fallback to USD
-  console.log(`Setting default currency for region ${region}: ${defaultCurrency}`);
-  return defaultCurrency;
-};
-
 // React component to handle async distance formatting
 const DistanceDisplay: React.FC<{ 
   distanceKm: number; 
-  className?: string; 
-}> = ({ distanceKm, className = "" }) => {
-  const [formattedDistance, setFormattedDistance] = useState<string>('Calculating...');
+  className?: string 
+}> = ({ distanceKm, className = '' }) => {
+  const [formattedDistance, setFormattedDistance] = useState<string>('');
 
   useEffect(() => {
-    formatDistance(distanceKm).then(setFormattedDistance);
+    const format = async () => {
+      const formatted = await formatDistance(distanceKm);
+      setFormattedDistance(formatted);
+    };
+    
+    format();
   }, [distanceKm]);
 
-  return (
-    <span className={className}>
-      📍 {formattedDistance}
-    </span>
-  );
+  return <span className={className}>{formattedDistance || '...'}</span>;
 };
 
 // --- Nearby Hotels Sidebar Component ---
@@ -470,7 +384,7 @@ function HotelDetailsContent({
     const initializeLocaleSettings = async () => {
       try {
         const detectedRegion = await detectUserRegion();
-        const defaultCurrency = await getDefaultCurrency();
+        const defaultCurrency = await getDefaultCurrency(detectedRegion);
         
         console.log('Initializing locale settings:', { detectedRegion, defaultCurrency });
         
@@ -994,7 +908,7 @@ function HotelDetailsContent({
                 </div>
               </div>              
               <div className="relative w-full group">
-                <label className="block text-sm font-medium text-gray-400 mb-1">Children</label>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Currency</label>
                 <select
                   value={currency}
                   onChange={(e) => handleCurrencyChange(e.target.value)}

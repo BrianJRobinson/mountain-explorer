@@ -1,32 +1,30 @@
 let librariesLoaded = false;
 
 export const loadMapLibraries = async () => {
-  console.log('[loadMapLibraries] Starting to load map libraries, librariesLoaded:', librariesLoaded);
+  // Starting to load map libraries
   
   if (librariesLoaded || typeof window === 'undefined') {
-    console.log('[loadMapLibraries] Libraries already loaded or window is undefined, returning early');
+    // Libraries already loaded or window is undefined
     return {
       leaflet: undefined,
     };
   }
 
   try {
-    console.log('[loadMapLibraries] Importing leaflet');
+    // Importing leaflet
     // Load libraries
     const [leaflet] = await Promise.all([
       import('leaflet'),
     ]);
     
-    console.log('[loadMapLibraries] Libraries imported successfully:', { 
-      leafletLoaded: !!leaflet, 
-    });
+    // Libraries imported successfully
     
     // Add Leaflet CSS
     const leafletCSS = document.createElement('link');
     leafletCSS.rel = 'stylesheet';
     leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(leafletCSS);
-    console.log('[loadMapLibraries] Added Leaflet CSS');
+    // Added Leaflet CSS
 
     // Fix Leaflet icon paths
     const script = document.createElement('script');
@@ -39,10 +37,10 @@ export const loadMapLibraries = async () => {
       });
     `;
     document.head.appendChild(script);
-    console.log('[loadMapLibraries] Added Leaflet icon fix script');
+    // Added Leaflet icon fix script
 
     librariesLoaded = true;
-    console.log('[loadMapLibraries] Libraries loaded successfully, returning');
+    // Libraries loaded successfully
     return {
       leaflet: leaflet.default,
     };

@@ -10,8 +10,9 @@ import Link from 'next/link';
 //import { getServerSession } from 'next-auth';
 //import { authOptions } from './api/auth/auth-options';
 import { HeroAvatar } from '@/components/HeroAvatar';
+import AccommodationLink from '@/components/AccommodationLink';
 
-export default async function HomePage() {
+export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -76,7 +77,9 @@ export default async function HomePage() {
                   Explore some of the UK&apos;s most beautiful and historic sites.
                 </p>
               </div>
-            </Link>            
+            </Link>      
+
+            <AccommodationLink />                   
           </div>
         </div>
       </section>

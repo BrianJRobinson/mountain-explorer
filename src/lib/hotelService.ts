@@ -136,14 +136,14 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
   // Check if we have cached data that's still valid
   const cachedData = hotelCache.get(cacheKey);
   if (cachedData && (Date.now() - cachedData.timestamp < CACHE_EXPIRY)) {
-    console.log('[hotelService] Returning cached hotel data');
+    // Returning cached hotel data
     return cachedData.data;
   }
   
   // No need for API key here as it's handled by the server-side API route
   
   try {
-    console.log(`[hotelService] Fetching hotels near ${latitude}, ${longitude} with radius ${radius}m`);
+    // Fetching hotels from API
     
     // Use our Next.js API route as a proxy to avoid CORS issues
     const response = await fetch(`/api/hotels?latitude=${latitude}&longitude=${longitude}&radius=${radius}`);
@@ -153,13 +153,6 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
     }
     
     const data = await response.json();
-    console.log('[hotelService] API response structure:', {
-      keys: Object.keys(data),
-      hasHotels: 'hotels' in data,
-      hotelsType: data.hotels ? typeof data.hotels : 'undefined',
-      isArray: Array.isArray(data.hotels),
-      responsePreview: JSON.stringify(data).substring(0, 200) + '...'
-    });
     
     const rawHotels = data.hotels || [];
     const mergedHotels = deduplicateAndMergeHotels(rawHotels);
@@ -169,7 +162,7 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
     // Cache the results
     hotelCache.set(cacheKey, { data: filteredHotels, timestamp: Date.now() });
     
-    console.log(`[hotelService] Found ${filteredHotels.length} hotels`);
+    // Filtered hotels based on criteria
     return filteredHotels;
   } catch (error) {
     console.error('[hotelService] Error fetching hotels:', error);
@@ -187,7 +180,7 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
  */
 export async function getHotelDetails(hotelId: string): Promise<HotelDetails | null> {
   try {
-    console.log(`[hotelService] Fetching details for hotel ID: ${hotelId}`);
+    // Fetching hotel details from API
     
     // Use our Next.js API route as a proxy
     const response = await fetch(`/api/hotels/${hotelId}`);
@@ -197,7 +190,7 @@ export async function getHotelDetails(hotelId: string): Promise<HotelDetails | n
     }
     
     const data = await response.json();
-    console.log('[hotelService] Received hotel details:', data);
+    // Received hotel details from API
     
     return data.hotel || null;
   } catch (error) {
@@ -261,7 +254,7 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
   // Function to manually trigger a refetch
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const refetch = (newLat?: number, newLng?: number, newRadius?: number) => {
-    console.log('[hotelService] Manually refetching hotels');
+    // Manually refetching hotels
     // If new coordinates are provided, update the state before triggering the fetch
     if (newLat !== undefined && newLng !== undefined) {
       // This part is tricky because we can't directly set state and then fetch
@@ -279,19 +272,19 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
     
     const fetchHotels = async () => {
       if (!lat || !lng || !enabled) {
-        console.log('[useHotelsNearby] Not fetching hotels:', { lat, lng, enabled });
+        // Not fetching hotels - conditions not met
         setHotels([]); // Clear hotels if fetching is disabled
         setLoading(false);
         return;
       }
       
-      console.log('[useHotelsNearby] Fetching hotels:', { lat, lng, radius, enabled });
+      // Fetching hotels for coordinates
       setLoading(true);
       setError(null);
       
       try {
         const data = await getHotelsNearby(lat, lng, radius, excludeHotelId);
-        console.log('[useHotelsNearby] Received hotel data:', { count: data.length, firstHotel: data[0] });
+        // Received hotel data from API
         if (isMounted) {
           setHotels(data);
         }

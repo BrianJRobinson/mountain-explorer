@@ -27,10 +27,7 @@ export function saveMapState(state: MapState): void {
     if (typeof window !== 'undefined') {
       const serialized = JSON.stringify(state);
       sessionStorage.setItem(MAP_STATE_STORAGE_KEY, serialized);
-      console.log('🗺️ [MAP STATE] Saved map state:', {
-        state,
-        timestamp: new Date().toISOString()
-      });
+      // Map state saved to sessionStorage
     }
   } catch (error) {
     console.error('🚨 [MAP STATE] Failed to save map state:', error);
@@ -39,27 +36,27 @@ export function saveMapState(state: MapState): void {
 
 // Load map state from sessionStorage
 export function loadMapState(): MapState {
-  console.log('🗺️ [MAP STATE] Loading map state...');
+  // Loading map state from sessionStorage
   
   try {
     if (typeof window !== 'undefined') {
       const stored = sessionStorage.getItem(MAP_STATE_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('✅ [MAP STATE] Successfully loaded map state:', parsed);
+        // Successfully loaded map state from sessionStorage
         return parsed;
       } else {
-        console.log('ℹ️ [MAP STATE] No stored map state found');
+        // No stored map state found
       }
     } else {
-      console.log('ℹ️ [MAP STATE] Window undefined - using defaults (SSR)');
+      // Window undefined - using defaults (SSR)
     }
   } catch (error) {
     console.error('🚨 [MAP STATE] Failed to load map state:', error);
   }
   
   const defaults = getDefaultMapState();
-  console.log('🔄 [MAP STATE] Using default map state:', defaults);
+  // Using default map state
   return defaults;
 }
 
@@ -68,7 +65,7 @@ export function clearMapState(): void {
   try {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem(MAP_STATE_STORAGE_KEY);
-      console.log('🗑️ [MAP STATE] Map state cleared');
+      // Map state cleared from sessionStorage
     }
   } catch (error) {
     console.error('🚨 [MAP STATE] Failed to clear map state:', error);
@@ -87,5 +84,5 @@ export function updateMapPosition(center: { lat: number; lng: number }, zoom: nu
   const currentState = loadMapState();
   const newState = { ...currentState, center, zoom };
   saveMapState(newState);
-  console.log('🗺️ [MAP STATE] Updated map position:', { center, zoom });
+  // Updated map position in sessionStorage
 }
