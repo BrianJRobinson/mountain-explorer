@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { Mountain } from '@/app/types/Mountain';
 import { toast } from 'react-hot-toast';
@@ -14,7 +14,7 @@ import { CompletionModal } from './MountainCard/CompletionModal';
 import { CommentsModal } from './MountainCard/CommentsModal';
 import { CompletionCelebration } from './shared/CompletionCelebration';
 import { loadMapLibraries } from '@/lib/mapLibraries';
-import { loadMapState, updateMapState, updateMapPosition } from '@/lib/mapStateContext';
+import { loadMapState, updateMapState } from '@/lib/mapStateContext';
 
 interface MountainCardProps {
   mountain: Mountain;

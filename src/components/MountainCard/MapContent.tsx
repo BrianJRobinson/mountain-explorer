@@ -94,10 +94,6 @@ export const MapContent: React.FC<MapContentProps> = ({
     setIsLoadingMarkers(false);
   }, [mountain, onMountainSelect, onClose]);
 
-
-  const lat = parseFloat(mountain.ukHillsDbLatitude);
-  const lng = parseFloat(mountain.ukHillsDbLongitude);
-
   // Initialize 2D map
   const initialize2DMap = useCallback(async () => {
     if (typeof window === 'undefined' || !mapContainer.current) return;

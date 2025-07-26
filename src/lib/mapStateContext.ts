@@ -3,7 +3,6 @@
 
 export interface MapState {
   activeMountainId?: number;
-  is3D: boolean;
   hotelsVisible: boolean;
   // Map position and zoom for persistence
   center?: { lat: number; lng: number };
@@ -16,7 +15,6 @@ const MAP_STATE_STORAGE_KEY = 'mountain-explorer-map-state';
 export function getDefaultMapState(): MapState {
   return {
     activeMountainId: undefined,
-    is3D: false,
     hotelsVisible: false,
     center: undefined,
     zoom: undefined
