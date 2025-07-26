@@ -224,6 +224,10 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
       moveTimeout.current = setTimeout(() => {
         const currentMap = map || maplibreMap;
         if (!currentMap) return;
+        
+        // Add robust validation for map access
+        if (map && (!map.getContainer || !map.getContainer())) return;
+        if (maplibreMap && (!maplibreMap.getContainer || !maplibreMap.getContainer())) return;
 
         const center = currentMap.getCenter();
         const zoom = currentMap.getZoom();
@@ -235,13 +239,21 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
     };
 
     if (!useManualRefresh) {
-      if (map) map.on('moveend', handleMoveEnd);
-      if (maplibreMap) maplibreMap.on('moveend', handleMoveEnd);
+      if (map && map.getContainer && map.getContainer()) {
+        map.on('moveend', handleMoveEnd);
+      }
+      if (maplibreMap && maplibreMap.getContainer && maplibreMap.getContainer()) {
+        maplibreMap.on('moveend', handleMoveEnd);
+      }
     }
 
     return () => {
-      if (map) map.off('moveend', handleMoveEnd);
-      if (maplibreMap) maplibreMap.off('moveend', handleMoveEnd);
+      if (map && map.getContainer && map.getContainer()) {
+        map.off('moveend', handleMoveEnd);
+      }
+      if (maplibreMap && maplibreMap.getContainer && maplibreMap.getContainer()) {
+        maplibreMap.off('moveend', handleMoveEnd);
+      }
       if (moveTimeout.current) clearTimeout(moveTimeout.current);
     };
   }, [map, maplibreMap, useManualRefresh]);
@@ -261,11 +273,15 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
     const addMarkersAsync = async () => {
       if (!isMounted.current) return;
 
+      // Add a small delay to ensure map is fully initialized
+      await new Promise(resolve => setTimeout(resolve, 100));
+      if (!isMounted.current) return;
+
       const newMarkers3D: Marker[] = [];
       let newClusterLayer: L.MarkerClusterGroup | null = null;
 
       if (is3DMode) {
-        if (!maplibreMap) return;
+        if (!maplibreMap || !maplibreMap.getContainer || !maplibreMap.getContainer()) return;
         const maplibregl = await import('maplibre-gl').then((m) => m.default);
         if (!isMounted.current) return;
 
@@ -278,7 +294,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
           newMarkers3D.push(marker);
         });
       } else {
-        if (!map) return;
+        if (!map || !map.getContainer || !map.getContainer()) return;
 
         const clusterLayer = new L.MarkerClusterGroup({
           maxClusterRadius: 40,
@@ -326,10 +342,24 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
           clusterLayer.addLayer(marker);
         });
 
-        if (isMounted.current && map && map.getContainer && map.getContainer()) {
-          map.addLayer(clusterLayer);
+        // More robust map readiness check
+        const mapContainer = map?.getContainer?.();
+        if (isMounted.current && map && mapContainer && mapContainer.offsetParent !== null) {
+          try {
+            // Additional validation before adding layer
+            if (clusterLayer) {
+              map.addLayer(clusterLayer);
+              newClusterLayer = clusterLayer;
+            }
+          } catch (error) {
+            console.warn('Could not add cluster layer to map:', error);
+            // Don't set the cluster layer if it failed to add
+            newClusterLayer = null;
+          }
+        } else {
+          // If map is not ready, don't set the cluster layer
+          newClusterLayer = null;
         }
-        newClusterLayer = clusterLayer;
       }
 
       if (isMounted.current && map && map.getContainer && map.getContainer()) {
