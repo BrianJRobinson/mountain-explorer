@@ -22,7 +22,7 @@ const renderStars = (starCount: number, numericRating?: number): string => {
 
   return `<div class="flex items-center">${starsHtml}${ratingHtml}</div>`;
 };
-import { Marker } from 'maplibre-gl';
+
 import L from 'leaflet';
 import 'leaflet.markercluster';
 import { useHotelsNearby, Hotel } from '@/lib/hotelService';
@@ -30,9 +30,6 @@ import { useHotelsNearby, Hotel } from '@/lib/hotelService';
 // Define the props for the HotelMarkers component
 interface HotelMarkersProps {
   map: L.Map | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  maplibreMap: any; // MapLibre GL map instance
-  is3DMode: boolean;
   centerLat: number;
   centerLng: number;
   radius: number;
@@ -107,7 +104,6 @@ const addClusterStyles = () => {
 
 interface MapState {
   clusterLayer: L.MarkerClusterGroup | null;
-  markers3D: Marker[];
 }
 
 interface MapAction {
@@ -115,7 +111,6 @@ interface MapAction {
   payload: { 
     map?: L.Map | null;
     clusterLayer?: L.MarkerClusterGroup | null;
-    markers3D?: Marker[];
   };
 }
 
@@ -131,13 +126,9 @@ const mapStateReducer = (state: MapState, action: MapAction): MapState => {
           console.warn('Could not remove stale cluster layer', e);
         }
       }
-      if (state.markers3D) {
-        state.markers3D.forEach((m: Marker) => m.remove());
-      }
       return {
         ...state,
         clusterLayer: action.payload.clusterLayer || null,
-        markers3D: action.payload.markers3D || [],
       };
     case 'CLEAR_ALL':
       if (state.clusterLayer && action.payload.map) {
@@ -148,10 +139,7 @@ const mapStateReducer = (state: MapState, action: MapAction): MapState => {
           // Ignore errors if layer is already removed
         }
       }
-      if (state.markers3D) {
-        state.markers3D.forEach((m: Marker) => m.remove());
-      }
-      return { ...state, clusterLayer: null, markers3D: [] };
+      return { ...state, clusterLayer: null };
     default:
       return state;
   }
@@ -159,8 +147,6 @@ const mapStateReducer = (state: MapState, action: MapAction): MapState => {
 
 export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   map,
-  maplibreMap,
-  is3DMode,
   centerLat,
   centerLng,
   radius,
@@ -172,7 +158,6 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [mapState, dispatch] = useReducer(mapStateReducer, {
     clusterLayer: null,
-    markers3D: [],
   });
 
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: centerLat, lng: centerLng });
@@ -217,17 +202,16 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   }, [map]);
 
   useEffect(() => {
-    if (!map && !maplibreMap) return;
+    if (!map) return;
 
     const handleMoveEnd = () => {
       if (moveTimeout.current) clearTimeout(moveTimeout.current);
       moveTimeout.current = setTimeout(() => {
-        const currentMap = map || maplibreMap;
+        const currentMap = map ;
         if (!currentMap) return;
         
         // Add robust validation for map access
         if (map && (!map.getContainer || !map.getContainer())) return;
-        if (maplibreMap && (!maplibreMap.getContainer || !maplibreMap.getContainer())) return;
 
         const center = currentMap.getCenter();
         const zoom = currentMap.getZoom();
@@ -242,21 +226,15 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
       if (map && map.getContainer && map.getContainer()) {
         map.on('moveend', handleMoveEnd);
       }
-      if (maplibreMap && maplibreMap.getContainer && maplibreMap.getContainer()) {
-        maplibreMap.on('moveend', handleMoveEnd);
-      }
     }
 
     return () => {
       if (map && map.getContainer && map.getContainer()) {
         map.off('moveend', handleMoveEnd);
       }
-      if (maplibreMap && maplibreMap.getContainer && maplibreMap.getContainer()) {
-        maplibreMap.off('moveend', handleMoveEnd);
-      }
       if (moveTimeout.current) clearTimeout(moveTimeout.current);
     };
-  }, [map, maplibreMap, useManualRefresh]);
+  }, [map, useManualRefresh]);
 
   useEffect(() => {
     if (!visible) {
@@ -277,102 +255,86 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
       await new Promise(resolve => setTimeout(resolve, 100));
       if (!isMounted.current) return;
 
-      const newMarkers3D: Marker[] = [];
       let newClusterLayer: L.MarkerClusterGroup | null = null;
 
-      if (is3DMode) {
-        if (!maplibreMap || !maplibreMap.getContainer || !maplibreMap.getContainer()) return;
-        const maplibregl = await import('maplibre-gl').then((m) => m.default);
+      if (!map || !map.getContainer || !map.getContainer()) return;
+
+      const clusterLayer = new L.MarkerClusterGroup({
+        maxClusterRadius: 40,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        zoomToBoundsOnClick: true,
+        disableClusteringAtZoom: 14,
+        animate: true,
+        iconCreateFunction: (c: L.MarkerCluster) => {
+          const count = c.getChildCount();
+          const size = count > 20 ? 'large' : count > 10 ? 'medium' : 'small';
+          return L.divIcon({
+            html: `<div class="cluster-marker cluster-marker-${size} bg-purple-800 text-white rounded-full border-2 border-white flex items-center justify-center font-bold">${count}</div>`,
+            className: `marker-cluster marker-cluster-${size}`,
+            iconSize: L.point(40, 40),
+          });
+        },
+      });
+
+      hotels.forEach((hotel: Hotel) => {
         if (!isMounted.current) return;
-
-        hotels.forEach((hotel: Hotel) => {
-          const el = document.createElement('div');
-          el.className = 'hotel-marker';
-          const marker = new maplibregl.Marker(el)
-            .setLngLat([hotel.longitude, hotel.latitude])
-            .addTo(maplibreMap);
-          newMarkers3D.push(marker);
-        });
-      } else {
-        if (!map || !map.getContainer || !map.getContainer()) return;
-
-        const clusterLayer = new L.MarkerClusterGroup({
-          maxClusterRadius: 40,
-          spiderfyOnMaxZoom: true,
-          showCoverageOnHover: false,
-          zoomToBoundsOnClick: true,
-          disableClusteringAtZoom: 14,
-          animate: true,
-          iconCreateFunction: (c: L.MarkerCluster) => {
-            const count = c.getChildCount();
-            const size = count > 20 ? 'large' : count > 10 ? 'medium' : 'small';
-            return L.divIcon({
-              html: `<div class="cluster-marker cluster-marker-${size} bg-purple-800 text-white rounded-full border-2 border-white flex items-center justify-center font-bold">${count}</div>`,
-              className: `marker-cluster marker-cluster-${size}`,
-              iconSize: L.point(40, 40),
-            });
-          },
-        });
-
-        hotels.forEach((hotel: Hotel) => {
-          if (!isMounted.current) return;
-          const marker = L.marker([hotel.latitude, hotel.longitude], {
-            icon: L.divIcon({
-              className: 'hotel-marker-icon',
-              html: `<div class="w-6 h-6 bg-purple-800 rounded-full border-2 border-white shadow-lg flex items-center justify-center hover:bg-purple-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" class="w-4 h-4"><path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" /><path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" /></svg></div>`,
-              iconSize: [24, 24],
-              iconAnchor: [12, 12],
-            }),
-          }).bindPopup(() => {
-            return (
-              `<div class="w-64 font-sans">
-                ${hotel.thumbnail ? `<img src="${hotel.thumbnail}" alt="${hotel.name}" class="w-full h-32 object-cover rounded-t-lg" />` : ''}
-                <div class="p-3">
-                  <h3 class="text-lg font-bold text-gray-900 truncate">${hotel.name}</h3>
-                  <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-                    ${renderStars(hotel.starRating || 0, hotel.rating || 0)}
-                  </div>
-                  <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}&stars=${hotel.starRating || 0}" target="_blank" rel="noopener noreferrer" class="mt-4 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white font-semibold py-2 px-4 rounded-md transition-colors no-underline">
-                    View Details
-                  </a>
+        const marker = L.marker([hotel.latitude, hotel.longitude], {
+          icon: L.divIcon({
+            className: 'hotel-marker-icon',
+            html: `<div class="w-6 h-6 bg-purple-800 rounded-full border-2 border-white shadow-lg flex items-center justify-center hover:bg-purple-600 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" class="w-4 h-4"><path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.689-8.69a2.25 2.25 0 00-3.182 0l-8.69 8.69a.75.75 0 001.061 1.06l8.69-8.69z" /><path d="M12 5.432l8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 01-.75-.75v-4.5a.75.75 0 00-.75-.75h-3a.75.75 0 00-.75.75V21a.75.75 0 01-.75.75H5.625a1.875 1.875 0 01-1.875-1.875v-6.198a2.29 2.29 0 00.091-.086L12 5.43z" /></svg></div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+          }),
+        }).bindPopup(() => {
+          return (
+            `<div class="w-64 font-sans">
+              ${hotel.thumbnail ? `<img src="${hotel.thumbnail}" alt="${hotel.name}" class="w-full h-32 object-cover rounded-t-lg" />` : ''}
+              <div class="p-3">
+                <h3 class="text-lg font-bold text-gray-900 truncate">${hotel.name}</h3>
+                <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                  ${renderStars(hotel.starRating || 0, hotel.rating || 0)}
                 </div>
-              </div>`
-            );
-          }, { className: 'hotel-popup' });
-          clusterLayer.addLayer(marker);
-        });
+                <a href="/hotels/${hotel.id}?lat=${hotel.latitude}&lng=${hotel.longitude}&stars=${hotel.starRating || 0}" target="_blank" rel="noopener noreferrer" class="mt-4 block w-full text-center bg-orange-500 hover:bg-orange-600 !text-white font-semibold py-2 px-4 rounded-md transition-colors no-underline">
+                  View Details
+                </a>
+              </div>
+            </div>`
+          );
+        }, { className: 'hotel-popup' });
+        clusterLayer.addLayer(marker);
+      });
 
-        // More robust map readiness check
-        const mapContainer = map?.getContainer?.();
-        if (isMounted.current && map && mapContainer && mapContainer.offsetParent !== null) {
-          try {
-            // Additional validation before adding layer
-            if (clusterLayer) {
-              map.addLayer(clusterLayer);
-              newClusterLayer = clusterLayer;
-            }
-          } catch (error) {
-            console.warn('Could not add cluster layer to map:', error);
-            // Don't set the cluster layer if it failed to add
-            newClusterLayer = null;
+      // More robust map readiness check
+      const mapContainer = map?.getContainer?.();
+      if (isMounted.current && map && mapContainer && mapContainer.offsetParent !== null) {
+        try {
+          // Additional validation before adding layer
+          if (clusterLayer) {
+            map.addLayer(clusterLayer);
+            newClusterLayer = clusterLayer;
           }
-        } else {
-          // If map is not ready, don't set the cluster layer
+        } catch (error) {
+          console.warn('Could not add cluster layer to map:', error);
+          // Don't set the cluster layer if it failed to add
           newClusterLayer = null;
         }
+      } else {
+        // If map is not ready, don't set the cluster layer
+        newClusterLayer = null;
       }
 
       if (isMounted.current && map && map.getContainer && map.getContainer()) {
         dispatch({
           type: 'SET_MARKERS',
-          payload: { map, clusterLayer: newClusterLayer, markers3D: newMarkers3D },
+          payload: { map, clusterLayer: newClusterLayer},
         });
       }
     };
 
     addMarkersAsync();
 
-  }, [hotels, visible, loading, is3DMode, map, maplibreMap]);
+  }, [hotels, visible, loading, map]);
 
   useEffect(() => {
     if (onLoadingChange) onLoadingChange(loading);
@@ -380,7 +342,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
 
   // This function will be passed up to the parent to be called on manual refresh
   const handleManualRefresh = () => {
-    const currentMap = is3DMode ? maplibreMap : map;
+    const currentMap = map;
     if (!currentMap) return;
 
     const center = currentMap.getCenter();
@@ -401,7 +363,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
       onRefreshReady(handleManualRefresh);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useManualRefresh, onRefreshReady, map, maplibreMap]);
+  }, [useManualRefresh, onRefreshReady, map]);
 
   return <LoadingIndicator loading={loading && !useManualRefresh} />;
 };

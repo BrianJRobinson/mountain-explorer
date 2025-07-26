@@ -7,21 +7,18 @@ export const loadMapLibraries = async () => {
     console.log('[loadMapLibraries] Libraries already loaded or window is undefined, returning early');
     return {
       leaflet: undefined,
-      maplibre: undefined
     };
   }
 
   try {
-    console.log('[loadMapLibraries] Importing leaflet and maplibre-gl');
+    console.log('[loadMapLibraries] Importing leaflet');
     // Load libraries
-    const [leaflet, maplibre] = await Promise.all([
+    const [leaflet] = await Promise.all([
       import('leaflet'),
-      import('maplibre-gl')
     ]);
     
     console.log('[loadMapLibraries] Libraries imported successfully:', { 
       leafletLoaded: !!leaflet, 
-      maplibreLoaded: !!maplibre 
     });
     
     // Add Leaflet CSS
@@ -30,13 +27,6 @@ export const loadMapLibraries = async () => {
     leafletCSS.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
     document.head.appendChild(leafletCSS);
     console.log('[loadMapLibraries] Added Leaflet CSS');
-
-    // Add MapLibre CSS
-    const maplibreCSS = document.createElement('link');
-    maplibreCSS.rel = 'stylesheet';
-    maplibreCSS.href = 'https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css';
-    document.head.appendChild(maplibreCSS);
-    console.log('[loadMapLibraries] Added MapLibre CSS');
 
     // Fix Leaflet icon paths
     const script = document.createElement('script');
@@ -55,13 +45,11 @@ export const loadMapLibraries = async () => {
     console.log('[loadMapLibraries] Libraries loaded successfully, returning');
     return {
       leaflet: leaflet.default,
-      maplibre: maplibre.default
     };
   } catch (error) {
     console.error('[loadMapLibraries] Error loading map libraries:', error);
     return {
-      leaflet: undefined,
-      maplibre: undefined
+      leaflet: undefined
     };
   }
 };

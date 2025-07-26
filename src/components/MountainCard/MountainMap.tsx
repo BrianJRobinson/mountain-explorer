@@ -11,8 +11,6 @@ interface MountainMapProps {
   allMountains: Mountain[];
   onMountainSelect?: (mountainName: string) => void;
   onClose: () => void;
-  is3DMode: boolean;
-  onToggle3D: (enabled: boolean) => void;
   hotelsVisible: boolean;
   onToggleHotels: (visible: boolean) => void;
 }
@@ -23,8 +21,6 @@ export const MountainMap: React.FC<MountainMapProps> = ({
   allMountains,
   onMountainSelect,
   onClose,
-  is3DMode,
-  onToggle3D,
   hotelsVisible,
   onToggleHotels,
 }) => {
@@ -52,13 +48,6 @@ export const MountainMap: React.FC<MountainMapProps> = ({
           <h3 className="text-lg font-medium text-white">{mountain.ukHillsDbName} - Location Map</h3>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-300">3D</span>
-              <ToggleButton
-                isToggled={is3DMode}
-                onToggle={() => onToggle3D(!is3DMode)}
-                size="sm"
-                label={is3DMode ? 'Switch to 2D view' : 'Switch to 3D view'}
-              />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-300">Hotels</span>
@@ -110,7 +99,6 @@ export const MountainMap: React.FC<MountainMapProps> = ({
             <MapContent
               mountain={mountain}
               allMountains={allMountains}
-              is3DMode={is3DMode}
               showHotels={showHotels}
               onMountainSelect={onMountainSelect}
               onClose={onClose}
