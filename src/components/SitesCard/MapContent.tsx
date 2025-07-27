@@ -1,12 +1,10 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Site } from '@/app/types/Sites';
 import type { Map as LeafletMap } from 'leaflet';
-import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 
 interface MapContentProps {
   site: Site;
   allSites: Site[];
-  is3DMode: boolean;
   onSiteSelect?: (siteName: string) => void;
   onClose: () => void;
 }
@@ -14,14 +12,11 @@ interface MapContentProps {
 export const MapContent: React.FC<MapContentProps> = ({
   site,
   allSites,
-  is3DMode,
   onSiteSelect,
   onClose,
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
-  const maplibreMap = useRef<MapLibreMap | null>(null);
-  const markers3D = useRef<Marker[]>([]);
 
   const initialize2DMap = useCallback(async () => {
     console.log('[MapContent] Attempting to initialize 2D map...');
@@ -38,12 +33,6 @@ export const MapContent: React.FC<MapContentProps> = ({
     }
     console.log('[MapContent] Leaflet imported, container ready. Initializing 2D map.');
 
-    if (maplibreMap.current) {
-      markers3D.current.forEach(marker => marker.remove());
-      markers3D.current = [];
-      maplibreMap.current.remove();
-      maplibreMap.current = null;
-    }
     if (map.current) {
       map.current.remove();
       map.current = null;
@@ -110,110 +99,17 @@ export const MapContent: React.FC<MapContentProps> = ({
 
   }, [site, allSites]);
 
-  const initialize3DMap = useCallback(async () => {
-    console.log('[MapContent] Attempting to initialize 3D map...');
-
-    const maplibregl = (await import('maplibre-gl')).default;
-    if (!maplibregl) {
-      console.error('[MapContent] MapLibre GL JS failed to import!');
-      return;
-    }
-     if (!mapContainer.current) {
-       console.error('[MapContent] mapContainer ref is not available!');
-       return;
-    }
-    console.log('[MapContent] MapLibre imported, container ready. Initializing 3D map.');
-
-    if (map.current) {
-        map.current.remove();
-        map.current = null;
-    }
-    if (maplibreMap.current) {
-        markers3D.current.forEach(marker => marker.remove());
-        markers3D.current = [];
-        maplibreMap.current.remove();
-        maplibreMap.current = null;
-    }
-
-    const lat = site.latitude;
-    const lng = site.longitude;
-
-    const currentMap = new maplibregl.Map({
-      container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'osm': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
-          }
-        },
-        layers: [
-          {
-            id: 'osm-layer',
-            type: 'raster',
-            source: 'osm',
-            paint: { 'raster-opacity': 1 }
-          }
-        ]
-      },
-      center: [lng, lat],
-      zoom: 14,
-      pitch: 45,
-      bearing: 0
-    });
-    maplibreMap.current = currentMap;
-
-    currentMap.on('load', () => {
-      if (!currentMap) return;
-      console.log('[MapContent] 3D map loaded event triggered.');
-      allSites.forEach((s) => {
-        if (!currentMap) return;
-        const el = document.createElement('div');
-        el.className = 'w-3 h-3 bg-blue-500 rounded-full border border-white';
-        const marker = new maplibregl.Marker(el)
-          .setLngLat([s.longitude, s.latitude])
-          .addTo(currentMap);
-          
-        const popupContent = `<div class="text-center p-1"><strong class="text-xs">${s.name}</strong><br/><button onclick="window.dispatchEvent(new CustomEvent('site-selected-map', { detail: '${s.name}' }))" class="mt-1 px-1 py-0.5 bg-orange-500 text-white rounded text-xs">Details</button></div>`;
-        const popup = new maplibregl.Popup({ offset: 15, closeButton: false }).setHTML(popupContent);
-        marker.setPopup(popup);
-
-        markers3D.current.push(marker);
-
-        if (s.id === site.id) {
-          marker.togglePopup();
-          currentMap.flyTo({ center: [s.longitude, s.latitude], zoom: 15 });
-        }
-      });
-      console.log('[MapContent] Resizing 3D map after load.');
-      currentMap.resize();
-    });
-
-  }, [site, allSites]);
-
   useEffect(() => {
-    console.log(`[MapContent] Initialization effect running. is3DMode: ${is3DMode}`);
     (async () => {
-      if (is3DMode) {
-        await initialize3DMap();
-      } else {
-        await initialize2DMap();
-      }
+      await initialize2DMap();
     })();
 
     return () => {
       console.log('[MapContent] Cleaning up map instances.');
       map.current?.remove();
       map.current = null;
-      maplibreMap.current?.remove();
-      maplibreMap.current = null;
-      markers3D.current.forEach(marker => marker.remove());
-      markers3D.current = [];
     };
-  }, [is3DMode, initialize2DMap, initialize3DMap]);
+  }, [initialize2DMap]);
 
   useEffect(() => {
     const handleSiteSelected = (event: CustomEvent) => {

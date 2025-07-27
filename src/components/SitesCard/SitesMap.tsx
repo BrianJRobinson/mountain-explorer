@@ -20,7 +20,6 @@ export const SitesMap: React.FC<SitesMapProps> = ({
   onSiteSelect,
   onClose,
 }) => {
-  const [is3DMode, setIs3DMode] = useState(false);
 
   if (!isOpen) return null;
 
@@ -43,15 +42,6 @@ export const SitesMap: React.FC<SitesMapProps> = ({
             {site.name} - Location Map
           </h3>
           <div className="flex items-center flex-shrink-0 gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-300">3D</span>
-              <ToggleButton
-                isToggled={is3DMode}
-                onToggle={() => setIs3DMode(!is3DMode)}
-                size="sm"
-                label={is3DMode ? 'Switch to 2D view' : 'Switch to 3D view'}
-              />
-            </div>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors"
@@ -68,7 +58,6 @@ export const SitesMap: React.FC<SitesMapProps> = ({
             <MapContent
               site={site}
               allSites={allSites}
-              is3DMode={is3DMode}
               onSiteSelect={onSiteSelect}
               onClose={onClose}
             />
