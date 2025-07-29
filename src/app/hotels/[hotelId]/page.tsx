@@ -189,10 +189,12 @@ export default function HotelDetailsPage() {
   const { nearbyHotels, loading: nearbyLoading, error: nearbyError } = useHotelsNearby(
     latitude ?? 0,
     longitude ?? 0,
-    10000, // 10km radius
+    50000, // 50km radius (increased from 10km to find more hotels)
     // Enable only when not loading and we have coordinates from either URL or fetched data
     !loading && hasValidCoordinates,
-    hotelId
+    hotelId, // exclude current hotel from results
+    undefined, // manualRefreshTrigger - not used here
+    15 // Limit to 15 nearby hotels for the details page
   );
 
   if (!hotelId) return <ErrorState error={{ name: 'Error', message: 'Hotel ID is missing.' }} />;
@@ -515,6 +517,8 @@ function HotelDetailsContent({
   const handleBookNowClick = () => {
     if (!hotel || !selectedDate.checkIn || !selectedDate.checkOut) return;
 
+    console.log("Hotel Details: " + hotel);
+
     const whitelabelBaseUrl = process.env.NEXT_PUBLIC_LITEAPI_WHITELABEL_URL;
 
     if (!whitelabelBaseUrl) {
@@ -557,6 +561,8 @@ function HotelDetailsContent({
   const handleContinueSearchClick = () => {
     const whitelabelBaseUrl = process.env.NEXT_PUBLIC_LITEAPI_WHITELABEL_URL;
 
+    console.log("Hotel Details: " + hotel);
+
     if (!whitelabelBaseUrl) {
       console.error('LiteAPI Whitelabel URL is not configured.');
       setRatesError('Booking service is not configured. Please contact support.');
@@ -575,29 +581,18 @@ function HotelDetailsContent({
       language: 'en',
       
       // Alternative parameter names that booking sites commonly use
-      check_in: selectedDate.checkIn,
-      check_out: selectedDate.checkOut,
-      'checkin-date': selectedDate.checkIn,
-      'checkout-date': selectedDate.checkOut,
       guests: guests.adults.toString(),
       room_count: '1',
     });
 
-    // Add city/location parameters in multiple formats
-    if (hotel.city) {
-      params.set('name', hotel.city); // Primary location name parameter
-      params.set('city', hotel.city);
-      params.set('location', hotel.city);
-      params.set('destination', hotel.city);
-      params.set('q', hotel.city); // Common search query parameter
-    }
-
     // Add coordinates if available for more precise location
-    if (hotel.latitude && hotel.longitude) {
-      params.set('lat', hotel.latitude.toString());
-      params.set('lng', hotel.longitude.toString());
-      params.set('longitude', hotel.longitude.toString());
-      params.set('latitude', hotel.latitude.toString());
+    // Use hotel coordinates if available, otherwise fall back to referenceCoordinates
+    const lat = hotel.latitude ?? referenceCoordinates?.lat;
+    const lng = hotel.longitude ?? referenceCoordinates?.lng;
+    
+    if (lat && lng) {
+      // Also add as placeId parameter if needed by the partner site
+      params.set('placeId', `${lat},${lng}`);
     }
 
     // Ensure the base URL has a protocol
@@ -607,10 +602,12 @@ function HotelDetailsContent({
     }
 
     // Use the base whitelabel URL with comprehensive search parameters
-    const finalUrl = `${fullWhitelabelUrl}?${params.toString()}`;
+    const finalUrl = `${fullWhitelabelUrl}/hotels?${params.toString()}`;
 
     window.open(finalUrl, '_blank');
   };
+
+  {console.log(hotel)};
 
   return (
     <div className="space-y-8">

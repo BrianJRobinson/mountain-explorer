@@ -5,6 +5,7 @@ export async function GET(request: NextRequest) {
   const latitude = searchParams.get('latitude');
   const longitude = searchParams.get('longitude');
   const radius = searchParams.get('radius') || '10000';
+  const limit = searchParams.get('limit'); // Optional limit parameter
   
   console.log(`[API] Hotel request for lat=${latitude}, lng=${longitude}, radius=${radius}`);
   console.log('[API] Environment check:', {
@@ -148,10 +149,15 @@ export async function GET(request: NextRequest) {
     hotels = hotels.filter((hotel: any) => hotel.description && hotel.description.trim().length > 0);
     console.log(`[API] Filtered out ${hotelsBeforeDescriptionFilter - hotels.length} hotels with empty descriptions, ${hotels.length} remaining`);
 
-    // Manually limit the number of hotels to 15, as the API does not support a limit parameter
-    if (hotels.length > 15) {
-      hotels = hotels.slice(0, 15);
-      console.log(`[API] Returning ${hotels.length} hotels after applying limit`);
+    // Apply limit if specified (e.g., for nearby hotels list)
+    if (limit && !isNaN(parseInt(limit))) {
+      const limitNum = parseInt(limit);
+      if (hotels.length > limitNum) {
+        console.log(`[API] Applying limit of ${limitNum} hotels (was ${hotels.length})`);
+        hotels = hotels.slice(0, limitNum);
+      }
+    } else {
+      console.log(`[API] No limit applied, returning all ${hotels.length} hotels`);
     }
     
 
