@@ -87,12 +87,18 @@ export const MapContent: React.FC<MapContentProps> = ({
       const mLat = parseFloat(selectedMountain.ukHillsDbLatitude);
       const mLng = parseFloat(selectedMountain.ukHillsDbLongitude);
 
-      // Create custom orange icon for selected mountain
+      // Create custom orange icon for selected mountain (proper teardrop shape)
       const selectedMountainIcon = L.divIcon({
-        html: `<div style="background: #f97316; color: white; border: 2px solid white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">★</div>`,
+        html: `<div style="width: 25px; height: 41px; position: relative;">
+          <svg width="25" height="41" viewBox="0 0 25 41" style="position: absolute; top: 0; left: 0;">
+            <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 7.9 12.5 28.5 12.5 28.5s12.5-20.6 12.5-28.5C25 5.6 19.4 0 12.5 0z" fill="#f97316" stroke="white" stroke-width="1"/>
+            <circle cx="12.5" cy="12.5" r="8" fill="white"/>
+            <text x="12.5" y="16" text-anchor="middle" fill="#f97316" font-size="12" font-weight="bold">★</text>
+          </svg>
+        </div>`,
         className: 'selected-mountain-icon',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        iconSize: [25, 41],
+        iconAnchor: [12, 41]
       });
 
       const selectedMarker = L.marker([mLat, mLng], { icon: selectedMountainIcon })
