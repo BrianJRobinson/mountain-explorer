@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Mountain } from '@/app/types/Mountain';
 import { MapLoader } from './MapLoader';
@@ -27,8 +27,8 @@ export const MountainMap: React.FC<MountainMapProps> = ({
   // Use showHotels as alias for hotelsVisible prop for consistency with existing code
   const showHotels = hotelsVisible;
   
-  const [isHotelLoading, setIsHotelLoading] = useState(false);
   const refreshHotelsRef = useRef<(() => void) | null>(null);
+  //const [isHotelLoading, setIsHotelLoading] = useState(false);
   
   // No longer need sessionStorage - state is managed by parent component
 
@@ -106,7 +106,7 @@ export const MountainMap: React.FC<MountainMapProps> = ({
               onRefreshReady={(refreshFn) => {
                 refreshHotelsRef.current = refreshFn;
               }}
-              onLoadingChange={setIsHotelLoading}
+              //onLoadingChange={setIsHotelLoading}
             />
           </MapLoader>
         </div>

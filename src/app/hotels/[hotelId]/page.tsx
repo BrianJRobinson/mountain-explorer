@@ -192,9 +192,7 @@ export default function HotelDetailsPage() {
     50000, // 50km radius (increased from 10km to find more hotels)
     // Enable only when not loading and we have coordinates from either URL or fetched data
     !loading && hasValidCoordinates,
-    hotelId, // exclude current hotel from results
-    undefined, // manualRefreshTrigger - not used here
-    15 // Limit to 15 nearby hotels for the details page
+    hotelId // exclude current hotel from results
   );
 
   if (!hotelId) return <ErrorState error={{ name: 'Error', message: 'Hotel ID is missing.' }} />;

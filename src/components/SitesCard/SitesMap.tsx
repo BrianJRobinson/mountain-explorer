@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import { Site } from '@/app/types/Sites';
 import { MapLoader } from './MapLoader';
 import { MapContent } from './MapContent';
-import { ToggleButton } from '../shared/ToggleButton';
 
 interface SitesMapProps {
   isOpen: boolean;

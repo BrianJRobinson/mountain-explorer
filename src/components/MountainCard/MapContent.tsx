@@ -28,9 +28,12 @@ export const MapContent: React.FC<MapContentProps> = ({
   const [isLoadingMarkers, setIsLoadingMarkers] = useState(false);
 
   // Ref to store the mountain cluster group so we can remove it on unmount or refresh
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mountainClusterGroupRef = useRef<any>(null);
   
   // Ref to store the search area circle for debugging
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchAreaCircleRef = useRef<any>(null);
 
   // Add mountain markers as a separate cluster group
@@ -52,9 +55,12 @@ export const MapContent: React.FC<MapContentProps> = ({
     }
 
     // Create a new cluster group for mountains
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mountainClusterGroup = (L as any).markerClusterGroup({
-      iconCreateFunction: function (cluster: any) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        iconCreateFunction: function (cluster: any) {
         // Check if the selected mountain is in this cluster
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const hasSelectedMountain = cluster.getAllChildMarkers().some((marker: any) => {
           const markerLat = marker.getLatLng().lat;
           const markerLng = marker.getLatLng().lng;
@@ -200,7 +206,6 @@ export const MapContent: React.FC<MapContentProps> = ({
     
     // Get the map bounds to calculate viewport-based radius
     const bounds = map.current.getBounds();
-    const center = map.current.getCenter();
     
     // Calculate the distance from center to the edge of the viewport
     const latDiff = Math.abs(bounds.getNorth() - bounds.getSouth()) / 2;
