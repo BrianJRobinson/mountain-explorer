@@ -48,6 +48,7 @@ export const SitesCard: React.FC<SitesCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [hotelsVisible, setHotelsVisible] = useState(false);
 
   const hasUserRated = !!site.userRating;
   const userRating = site.userRating;
@@ -242,6 +243,8 @@ export const SitesCard: React.FC<SitesCardProps> = ({
         allSites={allSites || []}
         onSiteSelect={handleSiteSelectFromMap}
         onClose={handleCloseMap}
+        hotelsVisible={hotelsVisible}
+        onToggleHotels={setHotelsVisible}
       />
     </>
   );

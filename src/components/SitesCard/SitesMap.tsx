@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Site } from '@/app/types/Sites';
 import { MapLoader } from './MapLoader';
 import { MapContent } from './MapContent';
+import { ToggleButton } from '../shared/ToggleButton';
 
 interface SitesMapProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface SitesMapProps {
   allSites: Site[];
   onSiteSelect?: (siteName: string) => void;
   onClose: () => void;
+  hotelsVisible: boolean;
+  onToggleHotels: (visible: boolean) => void;
 }
 
 export const SitesMap: React.FC<SitesMapProps> = ({
@@ -18,7 +21,13 @@ export const SitesMap: React.FC<SitesMapProps> = ({
   allSites,
   onSiteSelect,
   onClose,
+  hotelsVisible,
+  onToggleHotels,
 }) => {
+  // Use showHotels as alias for hotelsVisible prop for consistency with existing code
+  const showHotels = hotelsVisible;
+  
+  const refreshHotelsRef = useRef<(() => void) | null>(null);
 
   if (!isOpen) return null;
 
@@ -40,7 +49,18 @@ export const SitesMap: React.FC<SitesMapProps> = ({
           >
             {site.name} - Location Map
           </h3>
-          <div className="flex items-center flex-shrink-0 gap-4">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-300">Hotels</span>
+              <ToggleButton
+                isToggled={showHotels}
+                onToggle={() => onToggleHotels(!showHotels)}
+                size="sm"
+                label={showHotels ? 'Hide Hotels' : 'Show Hotels'}
+              />
+            </div>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors"
@@ -57,8 +77,12 @@ export const SitesMap: React.FC<SitesMapProps> = ({
             <MapContent
               site={site}
               allSites={allSites}
+              showHotels={showHotels}
               onSiteSelect={onSiteSelect}
               onClose={onClose}
+              onRefreshReady={(refreshFn: () => void) => {
+                refreshHotelsRef.current = refreshFn;
+              }}
             />
           </MapLoader>
         </div>

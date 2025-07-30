@@ -1,19 +1,26 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { Site } from '@/app/types/Sites';
 import type { Map as LeafletMap } from 'leaflet';
+import { HotelMarkers } from '../Map/HotelMarkers';
 
 interface MapContentProps {
   site: Site;
   allSites: Site[];
+  showHotels: boolean;
   onSiteSelect?: (siteName: string) => void;
   onClose: () => void;
+  onRefreshReady?: (refreshFn: () => void) => void;
+  onLoadingChange?: (isLoading: boolean) => void;
 }
 
 export const MapContent: React.FC<MapContentProps> = ({
   site,
   allSites,
+  showHotels,
   onSiteSelect,
   onClose,
+  onRefreshReady,
+  onLoadingChange,
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -22,6 +29,10 @@ export const MapContent: React.FC<MapContentProps> = ({
   // Ref to store the site cluster group so we can remove it on unmount or refresh
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const siteClusterGroupRef = useRef<any>(null);
+  
+  // Ref to store the search area circle for debugging
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const searchAreaCircleRef = useRef<any>(null);
 
   // Add site markers as a separate cluster group
   const addSiteMarkers = useCallback(async (sites: Site[]) => {
@@ -174,6 +185,60 @@ export const MapContent: React.FC<MapContentProps> = ({
     setIsLoadingMarkers(false);
   }, [site, onSiteSelect, onClose]);
 
+  // Function to calculate radius from zoom level (same as HotelMarkers)
+  const calculateRadiusFromZoom = useCallback((zoom: number): number => {
+    if (zoom >= 18) return 1000;
+    if (zoom >= 16) return 2000;
+    if (zoom >= 14) return 5000;
+    if (zoom >= 12) return 10000;
+    if (zoom >= 10) return 15000;
+    if (zoom >= 8) return 25000;
+    if (zoom >= 6) return 35000;
+    return 50000; // Max 50km for very zoomed out views
+  }, []);
+
+  // Function to update the search area circle for debugging
+  const updateSearchAreaCircle = useCallback(async (centerLat: number, centerLng: number, radius: number) => {
+    if (!map.current) return;
+    
+    const L = await import('leaflet').then(m => m.default);
+    
+    // Remove existing circle
+    if (searchAreaCircleRef.current) {
+      map.current.removeLayer(searchAreaCircleRef.current);
+    }
+    
+    // Get the map bounds to calculate viewport-based radius
+    const bounds = map.current.getBounds();
+    
+    // Calculate the distance from center to the edge of the viewport
+    const latDiff = Math.abs(bounds.getNorth() - bounds.getSouth()) / 2;
+    const lngDiff = Math.abs(bounds.getEast() - bounds.getWest()) / 2;
+    
+    // Use the smaller dimension to create a circle that fits within the viewport
+    const viewportRadius = Math.min(latDiff, lngDiff) * 111000; // Convert degrees to meters (roughly)
+    
+    // Use the smaller of the calculated viewport radius or the provided radius
+    const finalRadius = Math.min(viewportRadius, radius);
+    
+    // Create new circle
+    searchAreaCircleRef.current = L.circle([centerLat, centerLng], {
+      radius: finalRadius,
+      color: '#f97316', // Orange color
+      fillColor: '#f97316',
+      fillOpacity: 0.1,
+      weight: 2
+    }).addTo(map.current);
+    
+    console.log('🔍 [SEARCH AREA] Updated circle:', { 
+      centerLat, 
+      centerLng, 
+      radius, 
+      viewportRadius: Math.round(viewportRadius),
+      finalRadius: Math.round(finalRadius)
+    });
+  }, []);
+
   const initialize2DMap = useCallback(async () => {
     console.log('[MapContent] Attempting to initialize 2D map...');
     
@@ -233,9 +298,15 @@ export const MapContent: React.FC<MapContentProps> = ({
 
       // Add site markers as a cluster group
       addSiteMarkers(allSites);
+      
+      // Add initial search area circle for debugging
+      if (showHotels) {
+        const initialRadius = calculateRadiusFromZoom(13); // Default zoom level
+        updateSearchAreaCircle(lat, lng, initialRadius);
+      }
     }
 
-  }, [site, allSites, addSiteMarkers]);
+  }, [site, allSites, addSiteMarkers, showHotels, updateSearchAreaCircle, calculateRadiusFromZoom]);
 
   useEffect(() => {
     (async () => {
@@ -267,6 +338,20 @@ export const MapContent: React.FC<MapContentProps> = ({
       className="w-full h-full rounded-lg overflow-hidden bg-gray-700 relative"
       onClick={(e) => e.stopPropagation()}
     >
+      {/* HotelMarkers is responsible for its own cluster group */}
+      {showHotels && map.current && (
+        <HotelMarkers
+          map={map.current}
+          centerLat={site.latitude}
+          centerLng={site.longitude}
+          radius={10000}
+          visible={showHotels}
+          onRefreshReady={onRefreshReady}
+          onLoadingChange={onLoadingChange}
+          useManualRefresh={false}
+          onSearchAreaChange={updateSearchAreaCircle}
+        />
+      )}
       {isLoadingMarkers && (
         <div className="absolute bottom-4 right-4 bg-gray-900/80 text-white text-sm px-3 py-1.5 rounded-full flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
