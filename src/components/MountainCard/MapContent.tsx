@@ -27,72 +27,208 @@ export const MapContent: React.FC<MapContentProps> = ({
   const map = useRef<LeafletMap | null>(null);
   const [isLoadingMarkers, setIsLoadingMarkers] = useState(false);
 
-  // Add markers progressively
-  const addMarkers = useCallback(async (mountains: Mountain[]) => {
+  // Ref to store the mountain cluster group so we can remove it on unmount or refresh
+  const mountainClusterGroupRef = useRef<any>(null);
+  
+  // Ref to store the search area circle for debugging
+  const searchAreaCircleRef = useRef<any>(null);
+
+  // Add mountain markers as a separate cluster group
+  const addMountainMarkers = useCallback(async (mountains: Mountain[]) => {
     if (typeof window === 'undefined') return;
 
     setIsLoadingMarkers(true);
     const BATCH_SIZE = 10;
     const BATCH_DELAY = 50; // ms
 
-    // Import libraries based on mode
-    const [L] = await Promise.all([
-      import('leaflet').then(m => m.default),
-    ]);
+    // Import Leaflet and markercluster (side effect)
+    const L = await import('leaflet').then(m => m.default);
+    await import('leaflet.markercluster');
 
-    for (let i = 0; i < mountains.length; i += BATCH_SIZE) {
-      const batch = mountains.slice(i, i + BATCH_SIZE);
-      
-      // Process each batch
+    // Remove previous cluster group if it exists
+    if (mountainClusterGroupRef.current && map.current) {
+      map.current.removeLayer(mountainClusterGroupRef.current);
+      mountainClusterGroupRef.current = null;
+    }
+
+    // Create a new cluster group for mountains
+    const mountainClusterGroup = (L as any).markerClusterGroup({
+      iconCreateFunction: function (cluster: any) {
+        // Check if the selected mountain is in this cluster
+        const hasSelectedMountain = cluster.getAllChildMarkers().some((marker: any) => {
+          const markerLat = marker.getLatLng().lat;
+          const markerLng = marker.getLatLng().lng;
+          const selectedLat = parseFloat(selectedMountain?.ukHillsDbLatitude || '0');
+          const selectedLng = parseFloat(selectedMountain?.ukHillsDbLongitude || '0');
+          return Math.abs(markerLat - selectedLat) < 0.0001 && Math.abs(markerLng - selectedLng) < 0.0001;
+        });
+
+        // Use orange background if selected mountain is in cluster, otherwise blue
+        const backgroundColor = hasSelectedMountain ? '#f97316' : '#2563eb';
+        
+        return L.divIcon({
+          html: `<div style="background: ${backgroundColor}; color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px;">${cluster.getChildCount()}</div>`,
+          className: 'mountain-cluster-icon',
+          iconSize: [40, 40]
+        });
+      }
+    });
+    mountainClusterGroupRef.current = mountainClusterGroup;
+
+    // First, add the selected mountain immediately
+    const selectedMountain = mountains.find(m => m.id === mountain.id);
+    if (selectedMountain && map.current) {
+      const mLat = parseFloat(selectedMountain.ukHillsDbLatitude);
+      const mLng = parseFloat(selectedMountain.ukHillsDbLongitude);
+
+      // Create custom orange icon for selected mountain
+      const selectedMountainIcon = L.divIcon({
+        html: `<div style="background: #f97316; color: white; border: 2px solid white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">★</div>`,
+        className: 'selected-mountain-icon',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      const selectedMarker = L.marker([mLat, mLng], { icon: selectedMountainIcon })
+        .bindPopup(
+          () => {
+            const container = document.createElement('div');
+            container.className = 'text-center';
+            container.innerHTML = `
+              <strong>${selectedMountain.ukHillsDbName}</strong><br/>
+              ${selectedMountain.Height}m - ${selectedMountain.MountainCategoryID === 12 ? 'Munro' : 'Corbett'}<br/>
+            `;
+
+            const button = document.createElement('button');
+            button.className = 'px-2 py-1 mt-2 bg-orange-500 text-white rounded-md text-sm cursor-pointer hover:bg-orange-600';
+            button.textContent = 'Highlight This';
+            button.onclick = () => {
+              if (onMountainSelect) {
+                onMountainSelect(selectedMountain.ukHillsDbName);
+                onClose();
+              }
+            };
+
+            container.appendChild(button);
+            return container;
+          },
+          {
+            className: 'mountain-popup'
+          }
+        )
+        .setZIndexOffset(1000);
+
+      mountainClusterGroup.addLayer(selectedMarker);
+      mountainClusterGroup.addTo(map.current);
+
+      // Center the map and open popup immediately for selected mountain
+      map.current.setView([mLat, mLng], 13);
+      selectedMarker.openPopup();
+    }
+
+    // Then add all other mountains progressively
+    const otherMountains = mountains.filter(m => m.id !== mountain.id);
+    for (let i = 0; i < otherMountains.length; i += BATCH_SIZE) {
+      const batch = otherMountains.slice(i, i + BATCH_SIZE);
+
       await new Promise<void>((resolve) => {
         setTimeout(() => {
           batch.forEach((m) => {
             const mLat = parseFloat(m.ukHillsDbLatitude);
             const mLng = parseFloat(m.ukHillsDbLongitude);
-            
-            if (map.current) {
-              // Add 2D marker
-              const marker = L.marker([mLat, mLng])
-                .addTo(map.current)
-                .bindPopup(
-                  () => {
-                    const container = document.createElement('div');
-                    container.className = 'text-center';
-                    container.innerHTML = `
-                      <strong>${m.ukHillsDbName}</strong><br/>
-                      ${m.Height}m - ${m.MountainCategoryID === 12 ? 'Munro' : 'Corbett'}<br/>
-                    `;
 
-                    const button = document.createElement('button');
-                    button.className = 'px-2 py-1 mt-2 bg-orange-500 text-white rounded-md text-sm cursor-pointer hover:bg-orange-600';
-                    button.textContent = 'Highlight This';
-                    button.onclick = () => {
-                      if (onMountainSelect) {
-                        onMountainSelect(m.ukHillsDbName);
-                        onClose();
-                      }
-                    };
+            const marker = L.marker([mLat, mLng])
+              .bindPopup(
+                () => {
+                  const container = document.createElement('div');
+                  container.className = 'text-center';
+                  container.innerHTML = `
+                    <strong>${m.ukHillsDbName}</strong><br/>
+                    ${m.Height}m - ${m.MountainCategoryID === 12 ? 'Munro' : 'Corbett'}<br/>
+                  `;
 
-                    container.appendChild(button);
-                    return container;
-                  },
-                  {
-                    className: 'mountain-popup'
-                  }
-                );
+                  const button = document.createElement('button');
+                  button.className = 'px-2 py-1 mt-2 bg-orange-500 text-white rounded-md text-sm cursor-pointer hover:bg-orange-600';
+                  button.textContent = 'Highlight This';
+                  button.onclick = () => {
+                    if (onMountainSelect) {
+                      onMountainSelect(m.ukHillsDbName);
+                      onClose();
+                    }
+                  };
 
-              if (m.id === mountain.id) {
-                marker.setZIndexOffset(1000);
-                marker.openPopup();
-              }
-            }
+                  container.appendChild(button);
+                  return container;
+                },
+                {
+                  className: 'mountain-popup'
+                }
+              );
+
+            mountainClusterGroup.addLayer(marker);
           });
           resolve();
         }, BATCH_DELAY);
       });
     }
+
     setIsLoadingMarkers(false);
   }, [mountain, onMountainSelect, onClose]);
+
+  // Function to calculate radius from zoom level (same as HotelMarkers)
+  const calculateRadiusFromZoom = useCallback((zoom: number): number => {
+    if (zoom >= 18) return 1000;
+    if (zoom >= 16) return 2000;
+    if (zoom >= 14) return 5000;
+    if (zoom >= 12) return 10000;
+    if (zoom >= 10) return 15000;
+    if (zoom >= 8) return 25000;
+    if (zoom >= 6) return 35000;
+    return 50000; // Max 50km for very zoomed out views
+  }, []);
+
+  // Function to update the search area circle for debugging
+  const updateSearchAreaCircle = useCallback(async (centerLat: number, centerLng: number, radius: number) => {
+    if (!map.current) return;
+    
+    const L = await import('leaflet').then(m => m.default);
+    
+    // Remove existing circle
+    if (searchAreaCircleRef.current) {
+      map.current.removeLayer(searchAreaCircleRef.current);
+    }
+    
+    // Get the map bounds to calculate viewport-based radius
+    const bounds = map.current.getBounds();
+    const center = map.current.getCenter();
+    
+    // Calculate the distance from center to the edge of the viewport
+    const latDiff = Math.abs(bounds.getNorth() - bounds.getSouth()) / 2;
+    const lngDiff = Math.abs(bounds.getEast() - bounds.getWest()) / 2;
+    
+    // Use the smaller dimension to create a circle that fits within the viewport
+    const viewportRadius = Math.min(latDiff, lngDiff) * 111000; // Convert degrees to meters (roughly)
+    
+    // Use the smaller of the calculated viewport radius or the provided radius
+    const finalRadius = Math.min(viewportRadius, radius);
+    
+    // Create new circle
+    searchAreaCircleRef.current = L.circle([centerLat, centerLng], {
+      radius: finalRadius,
+      color: '#f97316', // Orange color
+      fillColor: '#f97316',
+      fillOpacity: 0.1,
+      weight: 2
+    }).addTo(map.current);
+    
+    console.log('🔍 [SEARCH AREA] Updated circle:', { 
+      centerLat, 
+      centerLng, 
+      radius, 
+      viewportRadius: Math.round(viewportRadius),
+      finalRadius: Math.round(finalRadius)
+    });
+  }, []);
 
   // Initialize 2D map
   const initialize2DMap = useCallback(async () => {
@@ -104,7 +240,7 @@ export const MapContent: React.FC<MapContentProps> = ({
       map.current.remove();
       map.current = null;
     }
-    
+
     const lat = parseFloat(mountain.ukHillsDbLatitude);
     const lng = parseFloat(mountain.ukHillsDbLongitude);
 
@@ -113,20 +249,16 @@ export const MapContent: React.FC<MapContentProps> = ({
     const center = mapState.center ? [mapState.center.lat, mapState.center.lng] : [lat, lng];
     const zoom = mapState.zoom || 13;
 
-    console.log('🗺️ [MAP RESTORE] Restoring 2D map position:', { center, zoom, saved: !!mapState.center });
-
-    // Initialize map centered on saved position or current mountain with closer zoom
     map.current = L.map(mapContainer.current, {
       scrollWheelZoom: true,
       zoomControl: true,
-      maxZoom: 18, // Set a max zoom level to avoid errors
+      maxZoom: 18,
     }).setView(center as [number, number], zoom);
-    
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     }).addTo(map.current);
 
-    // Add event listeners to save map position when user moves or zooms
     map.current.on('moveend zoomend', () => {
       if (map.current) {
         const center = map.current.getCenter();
@@ -137,10 +269,7 @@ export const MapContent: React.FC<MapContentProps> = ({
 
     // Add custom zoom control
     const zoomAllButton = L.Control.extend({
-      options: {
-        position: 'topleft'
-      },
-
+      options: { position: 'topleft' },
       onAdd: function(map: LeafletMap) {
         const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
         const button = L.DomUtil.create('a', '', container);
@@ -152,10 +281,8 @@ export const MapContent: React.FC<MapContentProps> = ({
             </svg>
           </div>
         `;
-        
         L.DomEvent.on(button, 'click', function(e: Event) {
           L.DomEvent.stopPropagation(e);
-          // Create bounds object to fit all markers
           const bounds = L.latLngBounds([]);
           allMountains.forEach(m => {
             bounds.extend([
@@ -163,32 +290,33 @@ export const MapContent: React.FC<MapContentProps> = ({
               parseFloat(m.ukHillsDbLongitude)
             ]);
           });
-          // Fit the map to show all markers with some padding
           map.fitBounds(bounds, {
             padding: [50, 50],
             maxZoom: 10
           });
         });
-
         return container;
       }
     });
 
-    // Add the zoom control to the map
     if (map.current) {
       map.current.addControl(new zoomAllButton());
-
-      // Force a resize after a short delay to ensure the container is visible
       setTimeout(() => {
         if (map.current) {
           map.current.invalidateSize();
         }
       }, 100);
 
-      // Add markers progressively
-      addMarkers(allMountains);
+      // Add mountain markers as a cluster group
+      addMountainMarkers(allMountains);
+      
+      // Add initial search area circle for debugging
+      if (showHotels) {
+        const initialRadius = calculateRadiusFromZoom(zoom);
+        updateSearchAreaCircle(lat, lng, initialRadius);
+      }
     }
-  }, [mountain, allMountains, addMarkers]);
+  }, [mountain, allMountains, addMountainMarkers, showHotels, updateSearchAreaCircle, calculateRadiusFromZoom]);
 
   // Initialize map based on mode
   useEffect(() => {
@@ -198,6 +326,11 @@ export const MapContent: React.FC<MapContentProps> = ({
       if (map.current) {
         map.current.remove();
         map.current = null;
+      }
+      // Remove mountain cluster group
+      if (map.current && mountainClusterGroupRef.current) {
+        (map.current as LeafletMap).removeLayer(mountainClusterGroupRef.current);
+        mountainClusterGroupRef.current = null;
       }
       // Remove any added styles
       const style = document.querySelector('style[data-mountain-marker]');
@@ -213,23 +346,24 @@ export const MapContent: React.FC<MapContentProps> = ({
       className="w-full h-[50vh] md:h-[60vh] rounded-lg overflow-hidden bg-gray-700 relative"
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Conditionally render HotelMarkers with the correct props */}
+      {/* HotelMarkers is responsible for its own cluster group */}
       {showHotels && map.current && (
         <HotelMarkers
           map={map.current}
           centerLat={parseFloat(mountain.ukHillsDbLatitude)}
           centerLng={parseFloat(mountain.ukHillsDbLongitude)}
-          radius={10000} // Default 10km radius
+          radius={10000}
           visible={showHotels}
           onRefreshReady={onRefreshReady}
           onLoadingChange={onLoadingChange}
-          useManualRefresh={true} // Controlled by parent component
+          useManualRefresh={false}
+          onSearchAreaChange={updateSearchAreaCircle}
         />
       )}
-      
       {isLoadingMarkers && (
-        <div className="absolute bottom-4 right-4 bg-gray-900/80 text-white text-sm px-3 py-1.5 rounded-full">
-          Loading markers...
+        <div className="absolute bottom-4 right-4 bg-gray-900/80 text-white text-sm px-3 py-1.5 rounded-full flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          Loading nearby mountains...
         </div>
       )}
     </div>

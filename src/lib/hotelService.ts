@@ -146,13 +146,27 @@ export async function getHotelsNearby(latitude: number, longitude: number, radiu
     // Fetching hotels from API
     
     // Use our Next.js API route as a proxy to avoid CORS issues
-    const response = await fetch(`/api/hotels?latitude=${latitude}&longitude=${longitude}&radius=${radius}`);
+    const apiUrl = `/api/hotels?latitude=${latitude}&longitude=${longitude}&radius=${radius}`;
+    console.log('🌐 [HOTEL API CALL] Making request to:', apiUrl);
+    console.log('🌐 [HOTEL API CALL] Parameters:', {
+      latitude: latitude,
+      longitude: longitude,
+      radius: radius,
+      radiusKm: Math.round(radius / 1000)
+    });
+    
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
       throw new Error(`Error fetching hotels: ${response.status}`);
     }
     
     const data = await response.json();
+    
+    console.log('🌐 [HOTEL API RESPONSE] Received data:', {
+      totalHotels: data.hotels?.length || 0,
+      responseData: data
+    });
     
     const rawHotels = data.hotels || [];
     const mergedHotels = deduplicateAndMergeHotels(rawHotels);

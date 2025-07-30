@@ -23,13 +23,11 @@ const renderStars = (starCount: number, numericRating?: number): string => {
   return `<div class="flex items-center">${starsHtml}${ratingHtml}</div>`;
 };
 
-import L from 'leaflet';
-import 'leaflet.markercluster';
 import { useHotelsNearby, Hotel } from '@/lib/hotelService';
 
 // Define the props for the HotelMarkers component
 interface HotelMarkersProps {
-  map: L.Map | null;
+  map: any; // Will be L.Map when available
   centerLat: number;
   centerLng: number;
   radius: number;
@@ -37,6 +35,7 @@ interface HotelMarkersProps {
   useManualRefresh?: boolean;
   onRefreshReady?: (refetch: () => void) => void;
   onLoadingChange?: (loading: boolean) => void;
+  onSearchAreaChange?: (centerLat: number, centerLng: number, radius: number) => void;
 }
 
 // A simple, local LoadingIndicator component to avoid import issues.
@@ -66,6 +65,8 @@ const LoadingIndicator: React.FC<{ loading: boolean }> = ({ loading }) => {
 
 // Inject cluster styles into the document head
 const addClusterStyles = () => {
+  if (typeof window === 'undefined') return;
+  
   const styleId = 'marker-cluster-styles';
   if (document.getElementById(styleId)) return;
 
@@ -103,14 +104,14 @@ const addClusterStyles = () => {
 };
 
 interface MapState {
-  clusterLayer: L.MarkerClusterGroup | null;
+  clusterLayer: any | null; // Will be L.MarkerClusterGroup when available
 }
 
 interface MapAction {
   type: 'SET_MARKERS' | 'CLEAR_ALL';
   payload: { 
-    map?: L.Map | null;
-    clusterLayer?: L.MarkerClusterGroup | null;
+    map?: any | null; // Will be L.Map when available
+    clusterLayer?: any | null; // Will be L.MarkerClusterGroup when available
   };
 }
 
@@ -154,6 +155,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   useManualRefresh = false,
   onRefreshReady,
   onLoadingChange,
+  onSearchAreaChange,
 }) => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [mapState, dispatch] = useReducer(mapStateReducer, {
@@ -162,6 +164,7 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
 
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: centerLat, lng: centerLng });
   const [dynamicRadius, setDynamicRadius] = useState<number>(radius);
+  const [showRefreshHint, setShowRefreshHint] = useState(false);
   const moveTimeout = useRef<NodeJS.Timeout | null>(null);
   const isMounted = useRef(true);
 
@@ -171,7 +174,9 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
     if (zoom >= 14) return 5000;
     if (zoom >= 12) return 10000;
     if (zoom >= 10) return 15000;
-    return 20000;
+    if (zoom >= 8) return 25000;
+    if (zoom >= 6) return 35000;
+    return 50000; // Max 50km for very zoomed out views
   };
 
   const { nearbyHotels: hotels = [], loading, refetch } = useHotelsNearby(
@@ -181,13 +186,55 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
     visible
   );
 
+  // Debug logging for API calls
+  useEffect(() => {
+    if (visible && !loading) {
+      console.log('🏨 [HOTEL API DEBUG] Search parameters:', {
+        centerLat: mapCenter.lat,
+        centerLng: mapCenter.lng,
+        radius: dynamicRadius,
+        radiusKm: Math.round(dynamicRadius / 1000),
+        zoom: map?.getZoom?.(),
+        hotelsFound: hotels?.length || 0,
+        visible: visible
+      });
+      
+      // Log hotel locations to check if they're within the expected radius
+      if (hotels && hotels.length > 0) {
+        const hotelsOutsideRadius = hotels.filter(hotel => {
+          const distance = Math.sqrt(
+            Math.pow((hotel.latitude - mapCenter.lat) * 111000, 2) + 
+            Math.pow((hotel.longitude - mapCenter.lng) * 111000, 2)
+          );
+          return distance > dynamicRadius;
+        });
+        
+        if (hotelsOutsideRadius.length > 0) {
+          console.warn('⚠️ [HOTEL API DEBUG] Hotels found outside search radius:', {
+            totalHotels: hotels.length,
+            hotelsOutsideRadius: hotelsOutsideRadius.length,
+            searchRadius: dynamicRadius,
+            searchRadiusKm: Math.round(dynamicRadius / 1000),
+            exampleOutsideHotel: hotelsOutsideRadius[0]
+          });
+        }
+      }
+    }
+  }, [mapCenter.lat, mapCenter.lng, dynamicRadius, hotels, loading, visible, map]);
+
   useEffect(() => {
     addClusterStyles();
     isMounted.current = true;
+    
+    // Initial search area circle
+    if (onSearchAreaChange) {
+      onSearchAreaChange(centerLat, centerLng, radius);
+    }
+    
     return () => {
       isMounted.current = false;
     };
-  }, []);
+  }, [onSearchAreaChange, centerLat, centerLng, radius]);
 
   // Final cleanup on unmount
   useEffect(() => {
@@ -219,13 +266,22 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
 
         setMapCenter({ lat: center.lat, lng: center.lng });
         setDynamicRadius(newRadius);
+        
+        // Update search area circle if callback provided
+        if (onSearchAreaChange) {
+          onSearchAreaChange(center.lat, center.lng, newRadius);
+        }
+        
+        // Show refresh hint if manual refresh is enabled
+        if (useManualRefresh) {
+          console.log('🔄 [HOTEL MARKERS] Map moved, showing refresh hint');
+          setShowRefreshHint(true);
+        }
       }, 1000);
     };
 
-    if (!useManualRefresh) {
-      if (map && map.getContainer && map.getContainer()) {
-        map.on('moveend', handleMoveEnd);
-      }
+    if (map && map.getContainer && map.getContainer()) {
+      map.on('moveend', handleMoveEnd);
     }
 
     return () => {
@@ -255,18 +311,22 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
       await new Promise(resolve => setTimeout(resolve, 100));
       if (!isMounted.current) return;
 
-      let newClusterLayer: L.MarkerClusterGroup | null = null;
+      // Dynamic import of Leaflet to avoid SSR issues
+      const L = await import('leaflet').then(m => m.default);
+      await import('leaflet.markercluster');
+
+      let newClusterLayer: any = null;
 
       if (!map || !map.getContainer || !map.getContainer()) return;
 
-      const clusterLayer = new L.MarkerClusterGroup({
+      const clusterLayer = new (L as any).markerClusterGroup({
         maxClusterRadius: 40,
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
         zoomToBoundsOnClick: true,
         disableClusteringAtZoom: 14,
         animate: true,
-        iconCreateFunction: (c: L.MarkerCluster) => {
+        iconCreateFunction: (c: any) => {
           const count = c.getChildCount();
           const size = count > 20 ? 'large' : count > 10 ? 'medium' : 'small';
           return L.divIcon({
@@ -353,6 +413,9 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
     setMapCenter({ lat: center.lat, lng: center.lng });
     setDynamicRadius(newRadius);
 
+    // Hide the refresh hint when refresh is triggered
+    setShowRefreshHint(false);
+
     // The state update will trigger the useEffect that calls the hook.
     // We can also call refetch() if we want to force it even if coordinates are the same.
     refetch();
@@ -365,5 +428,28 @@ export const HotelMarkers: React.FC<HotelMarkersProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useManualRefresh, onRefreshReady, map]);
 
-  return <LoadingIndicator loading={loading && !useManualRefresh} />;
+  return (
+    <>
+      <LoadingIndicator loading={loading && !useManualRefresh} />
+      {showRefreshHint && useManualRefresh && (
+        <div className="fixed z-[9999] top-20 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 animate-pulse border-2 border-white">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <span className="text-sm font-medium">Click refresh to see hotels in this area</span>
+        </div>
+      )}
+    </>
+  );
 };
