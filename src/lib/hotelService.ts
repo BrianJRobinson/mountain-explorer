@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 
 // --- Helper Functions ---
 
@@ -265,19 +265,50 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
   const [error, setError] = useState<Error | null>(null);
   const [fetchTrigger, setFetchTrigger] = useState(0); // To manually trigger refetch
   
+  // Cache for storing the last successful API call parameters
+  const lastApiCallRef = useRef<{
+    lat: number;
+    lng: number;
+    radius: number;
+    excludeHotelId?: string;
+  } | null>(null);
+  
+  // Function to calculate distance between two coordinates in meters
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+  
+  // Function to check if we should skip the API call based on distance
+  const shouldSkipApiCall = useCallback((newLat: number, newLng: number, newRadius: number, newExcludeHotelId?: string): boolean => {
+    if (!lastApiCallRef.current) return false;
+    
+    const lastCall = lastApiCallRef.current;
+    const distance = calculateDistance(lastCall.lat, lastCall.lng, newLat, newLng);
+    const distanceKm = distance / 1000;
+    
+    // Skip if center hasn't moved more than 10km and other parameters are the same
+    if (distanceKm <= 10 && 
+        lastCall.radius === newRadius && 
+        lastCall.excludeHotelId === newExcludeHotelId) {
+      console.log('🔄 [HOTEL CACHE] Skipping API call - center moved only', distanceKm.toFixed(1), 'km');
+      return true;
+    }
+    
+    return false;
+  }, []);
+  
   // Function to manually trigger a refetch
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const refetch = (newLat?: number, newLng?: number, newRadius?: number) => {
-    // Manually refetching hotels
-    // If new coordinates are provided, update the state before triggering the fetch
-    if (newLat !== undefined && newLng !== undefined) {
-      // This part is tricky because we can't directly set state and then fetch
-      // in the same cycle. The fetch trigger is the primary mechanism.
-      // The actual state update for lat/lng should happen in the component calling the hook.
-      // The purpose here is to ensure the useEffect dependency check works.
-      // A better approach is to handle the coordinate update in the component
-      // and just use the trigger here. The logic will be in HotelMarkers.tsx
-    }
+    // Force a new API call by updating the trigger
     setFetchTrigger(prev => prev + 1);
   };
 
@@ -292,6 +323,12 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
         return;
       }
       
+      // Check if we should skip this API call
+      if (shouldSkipApiCall(lat, lng, radius, excludeHotelId)) {
+        console.log('🔄 [HOTEL CACHE] Using cached data - no API call needed');
+        return;
+      }
+      
       // Fetching hotels for coordinates
       setLoading(true);
       setError(null);
@@ -301,6 +338,8 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
         // Received hotel data from API
         if (isMounted) {
           setHotels(data);
+          // Update the last API call reference
+          lastApiCallRef.current = { lat, lng, radius, excludeHotelId };
         }
       } catch (err) {
         console.error('[useHotelsNearby] Error fetching hotels:', err);
@@ -319,7 +358,7 @@ export function useHotelsNearby(lat: number, lng: number, radius: number = 10000
     return () => {
       isMounted = false;
     };
-  }, [lat, lng, radius, enabled, fetchTrigger, excludeHotelId]);
+  }, [lat, lng, radius, enabled, fetchTrigger, excludeHotelId, shouldSkipApiCall]);
   
   return { nearbyHotels: hotels, loading, error, refetch };
 }

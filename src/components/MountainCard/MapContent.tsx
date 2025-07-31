@@ -35,6 +35,9 @@ export const MapContent: React.FC<MapContentProps> = ({
   // Ref to store the search area circle for debugging
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchAreaCircleRef = useRef<any>(null);
+  
+  // Debug toggle for search area circle (set to false to hide the circle)
+  const SHOW_SEARCH_AREA_CIRCLE = false;
 
   // Add mountain markers as a separate cluster group
   const addMountainMarkers = useCallback(async (mountains: Mountain[]) => {
@@ -201,7 +204,7 @@ export const MapContent: React.FC<MapContentProps> = ({
 
   // Function to update the search area circle for debugging
   const updateSearchAreaCircle = useCallback(async (centerLat: number, centerLng: number, radius: number) => {
-    if (!map.current) return;
+    if (!map.current || !SHOW_SEARCH_AREA_CIRCLE) return;
     
     const L = await import('leaflet').then(m => m.default);
     
@@ -327,7 +330,7 @@ export const MapContent: React.FC<MapContentProps> = ({
         updateSearchAreaCircle(lat, lng, initialRadius);
       }
     }
-  }, [mountain, allMountains, addMountainMarkers, showHotels, updateSearchAreaCircle, calculateRadiusFromZoom]);
+  }, [mountain, allMountains, addMountainMarkers, showHotels, updateSearchAreaCircle, calculateRadiusFromZoom, SHOW_SEARCH_AREA_CIRCLE]);
 
   // Initialize map based on mode
   useEffect(() => {

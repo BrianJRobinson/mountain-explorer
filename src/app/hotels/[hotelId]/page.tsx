@@ -100,7 +100,7 @@ const DistanceDisplay: React.FC<{
 
 // --- Nearby Hotels Sidebar Component ---
 const NearbyHotels: React.FC<{ 
-  hotels: Hotel[] | undefined, 
+  hotels: (Hotel & { distance?: number })[] | undefined, 
   loading: boolean, 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: any,
@@ -113,8 +113,8 @@ const NearbyHotels: React.FC<{
   // Get current booking details to preserve in nearby hotel links
   const currentBooking = loadBookingDetails();
   
-  // Limit to 3 rows of 5 columns (15 hotels)
-  const displayedHotels = hotels.slice(0, 15);
+  // Hotels are already filtered, sorted, and limited to 15
+  const displayedHotels = hotels;
 
   return (
     <div className="mt-12">
@@ -136,7 +136,13 @@ const NearbyHotels: React.FC<{
               <h3 className="font-semibold text-md text-orange-600 truncate" title={nearbyHotel.name}>{nearbyHotel.name}</h3>
               <p className="text-sm text-gray-500 flex-grow">{nearbyHotel.city}</p>
               {/* Distance display for each nearby hotel */}
-              {referenceCoordinates && nearbyHotel.latitude && nearbyHotel.longitude && (
+              {nearbyHotel.distance !== undefined ? (
+                <p className="text-orange-400 text-xs mt-1 font-medium">
+                  <DistanceDisplay 
+                    distanceKm={nearbyHotel.distance}
+                  />
+                </p>
+              ) : referenceCoordinates && nearbyHotel.latitude && nearbyHotel.longitude ? (
                 <p className="text-orange-400 text-xs mt-1 font-medium">
                   <DistanceDisplay 
                     distanceKm={calculateDistance(
@@ -147,7 +153,7 @@ const NearbyHotels: React.FC<{
                     )}
                   />
                 </p>
-              )}
+              ) : null}
               <div className="mt-2 pt-2 border-t border-gray-100">
                 {(nearbyHotel.starRating ?? 0) > 0 && (
                   <div className="text-yellow-500 flex items-center text-sm">
@@ -186,14 +192,40 @@ export default function HotelDetailsPage() {
   const longitude = urlLng ? parseFloat(urlLng) : hotel?.longitude;
   const hasValidCoordinates = !!latitude && !!longitude;
 
-  const { nearbyHotels, loading: nearbyLoading, error: nearbyError } = useHotelsNearby(
+  // Custom hook for nearby hotels with distance filtering and ordering
+  const { nearbyHotels: allNearbyHotels, loading: nearbyLoading, error: nearbyError } = useHotelsNearby(
     latitude ?? 0,
     longitude ?? 0,
-    50000, // 50km radius (increased from 10km to find more hotels)
+    20000, // 20km radius for hotel details page
     // Enable only when not loading and we have coordinates from either URL or fetched data
     !loading && hasValidCoordinates,
     hotelId // exclude current hotel from results
   );
+
+  // Filter and sort nearby hotels for the details page
+  const nearbyHotels = React.useMemo(() => {
+    if (!allNearbyHotels || !hasValidCoordinates) return [];
+    
+    const referenceLat = latitude ?? 0;
+    const referenceLng = longitude ?? 0;
+    
+    // Filter hotels within 20km and calculate distances
+    const hotelsWithDistance = allNearbyHotels
+      .map(hotel => {
+        const distance = calculateDistance(
+          referenceLat,
+          referenceLng,
+          hotel.latitude,
+          hotel.longitude
+        );
+        return { ...hotel, distance };
+      })
+      .filter(hotel => hotel.distance <= 20) // Only hotels within 20km
+      .sort((a, b) => a.distance - b.distance) // Sort by distance (nearest first)
+      .slice(0, 15); // Limit to nearest 15
+    
+    return hotelsWithDistance;
+  }, [allNearbyHotels, latitude, longitude, hasValidCoordinates]);
 
   if (!hotelId) return <ErrorState error={{ name: 'Error', message: 'Hotel ID is missing.' }} />;
   if (loading) return <LoadingState />;
